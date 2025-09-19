@@ -1,0 +1,56 @@
+stages:
+  - build
+  - docker
+  - deploy
+
+variables:
+  APP_NAME: nextjs-app
+  AWS_REGION: ap-southeast-1              # change if needed
+  ECR_REGISTRY: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+  ECR_REPOSITORY: $APP_NAME
+  IMAGE_TAG: $CI_COMMIT_SHA
+
+# 1️⃣ Install dependencies & build Next.js
+build-app:
+  stage: build
+  image: node:18
+  script:
+    - npm ci
+    - npm run build
+    - npm run export
+  artifacts:
+    paths:
+      - .next
+      - node_modules
+    expire_in: 1h
+
+# 2️⃣ Build & push Docker image to ECR
+docker-build:
+  stage: docker
+  image: docker:24
+  services:
+    - docker:24-dind
+  before_script:
+    - apk add --no-cache python3 py3-pip bash
+    - pip3 install awscli
+    - aws --version
+    # login to AWS ECR
+    - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+  script:
+    - docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+    - docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+    - docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+# 3️⃣ Deploy to ECS
+deploy-ecs:
+  stage: deploy
+  image: amazon/aws-cli:2.15.7
+  script:
+    # update ECS service with new image
+    - aws ecs update-service \
+        --cluster $ECS_CLUSTER \
+        --service $ECS_SERVICE \
+        --force-new-deployment \
+        --region $AWS_REGION
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'   # deploy only on main branch
