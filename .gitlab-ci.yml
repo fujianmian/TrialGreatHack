@@ -1,50 +1,54 @@
-deploy-ecs:
-  stage: deploy
-  image: amazon/aws-cli:latest
+stages:
+  - build
+  - deploy
+
+variables:
+  IMAGE_NAME: "268060978153.dkr.ecr.ap-southeast-5.amazonaws.com/greataihack1"
+  NODE_ENV: "production"
+  AWS_REGION: "ap-southeast-5"
+
+# -----------------------------
+# Build & Push Docker Image
+# -----------------------------
+build:
+  stage: build
+  image: docker:24
+  services:
+    - name: docker:24-dind
+      alias: docker-dind
+  variables:
+    DOCKER_DRIVER: overlay2
   before_script:
-    - apk add --no-cache jq || true
+    - apk add --no-cache python3 py3-pip bash jq
+    - pip3 install --no-cache-dir awscli
+    - aws --version
+    - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin 268060978153.dkr.ecr.$AWS_REGION.amazonaws.com
+  script:
+    - echo "Building Docker image..."
+    - docker build -t $IMAGE_NAME:$IMAGE_TAG .
+    - docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
+    - echo "Pushing Docker image..."
+    - docker push $IMAGE_NAME:$IMAGE_TAG
+    - docker push $IMAGE_NAME:latest
+
+# -----------------------------
+# Deploy to ECS
+# -----------------------------
+deploy:
+  stage: deploy
+  image: docker:24
+  services:
+    - name: docker:24-dind
+      alias: docker-dind
+  before_script:
+    - apk add --no-cache python3 py3-pip bash jq
+    - pip3 install --no-cache-dir awscli
   script:
     - |
-      # create a minimal task definition JSON with the new image
-      cat > taskdef.json <<EOF
-      {
-        "family": "$TASK_FAMILY",
-        "networkMode": "awsvpc",
-        "executionRoleArn": "$TASK_EXECUTION_ROLE",
-        "taskRoleArn": "$TASK_ROLE",
-        "requiresCompatibilities": ["FARGATE"],
-        "cpu": "512",
-        "memory": "1024",
-        "containerDefinitions": [
-          {
-            "name": "$APP_NAME",
-            "image": "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG",
-            "portMappings": [{"containerPort": 3000, "protocol": "tcp"}],
-            "essential": true,
-            "logConfiguration": {
-              "logDriver": "awslogs",
-              "options": {
-                "awslogs-group": "$AWS_LOG_GROUP",
-                "awslogs-region": "$AWS_REGION",
-                "awslogs-stream-prefix": "$APP_NAME"
-              }
-            }
-          }
-        ]
-      }
-      EOF
-
-      # register the task definition
-      TASK_DEF_ARN=$(aws ecs register-task-definition \
-        --cli-input-json file://taskdef.json \
-        --query 'taskDefinition.taskDefinitionArn' --output text --region $AWS_REGION)
-      echo "Registered task definition: $TASK_DEF_ARN"
-
-      # update ECS service
+      echo "Deploying to ECS..."
       aws ecs update-service \
-        --cluster $ECS_CLUSTER \
-        --service $ECS_SERVICE \
-        --task-definition $TASK_DEF_ARN \
+        --cluster my-ecs-cluster \
+        --service my-ecs-service \
         --force-new-deployment \
         --region $AWS_REGION
   rules:
