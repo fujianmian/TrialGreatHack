@@ -1,42 +1,3 @@
-stages:
-  - docker
-  - deploy
-
-variables:
-  APP_NAME: nextjs-app
-  ECR_REPOSITORY: $ECR_REPOSITORY        # set in GitLab CI variables
-  AWS_REGION: $AWS_REGION
-  ECR_REGISTRY: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-  IMAGE_TAG: $CI_COMMIT_SHORT_SHA
-  DOCKER_TLS_CERTDIR: ""    # needed for docker:dind in many runners
-
-# Build image and push to ECR
-docker-build:
-  stage: docker
-  image: docker:24
-  services:
-    - name: docker:24-dind
-      alias: docker-dind
-  variables:
-    DOCKER_DRIVER: overlay2
-  before_script:
-    # install awscli (alpine) - if your runner base isn't alpine, change to apt-get
-    - apk add --no-cache python3 py3-pip jq bash || true
-    - pip3 install --no-cache-dir awscli || true
-    - aws --version
-    - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
-    - |
-      # ensure ECR repo exists (optional; requires CreateRepository permission)
-      if ! aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" --region "$AWS_REGION" >/dev/null 2>&1; then
-        aws ecr create-repository --repository-name "$ECR_REPOSITORY" --region "$AWS_REGION" || true
-      fi
-  script:
-    - docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
-    - docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-    - docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-  only:
-    - main
-
 deploy-ecs:
   stage: deploy
   image: amazon/aws-cli:2
@@ -72,12 +33,14 @@ deploy-ecs:
         ]
       }
       EOF
-    - >
+
+      # register the task definition
       TASK_DEF_ARN=$(aws ecs register-task-definition \
         --cli-input-json file://taskdef.json \
         --query 'taskDefinition.taskDefinitionArn' --output text --region $AWS_REGION)
-    - echo "Registered task definition: $TASK_DEF_ARN"
-    - |
+      echo "Registered task definition: $TASK_DEF_ARN"
+
+      # update ECS service
       aws ecs update-service \
         --cluster $ECS_CLUSTER \
         --service $ECS_SERVICE \
