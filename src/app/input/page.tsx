@@ -41,9 +41,13 @@ export default function InputPage() {
         setError("No obscure words found. Please try a longer article.");
       }
 
-    } catch (err: any) {
-      console.error("Request failed:", err);
-      setError(err.message || "Request failed, please try again later.");
+    } catch (error) {
+      console.error("Request failed:", error);
+      if (error instanceof Error) {
+        setError(error.message || "Request failed, please try again later.");
+      } else {
+        setError("Request failed, please try again later.");
+      }
     } finally {
       setLoading(false);
     }

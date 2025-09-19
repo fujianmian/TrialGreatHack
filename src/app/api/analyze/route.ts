@@ -78,24 +78,28 @@ ${text}`;
     return NextResponse.json({ result: parsedResult });
 
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Bedrock error:", error);
     
     // More detailed error handling
-    if (error.name === 'AccessDeniedException') {
+    if (error instanceof Error) {
+      if (error.name === 'AccessDeniedException') {
+        return NextResponse.json({ 
+          error: "Insufficient permissions, please check AWS IAM configuration" 
+        }, { status: 403 });
+      }
+      if (error.name === 'ValidationException') {
+        return NextResponse.json({ 
+          error: "Request parameter error" 
+        }, { status: 400 });
+      }
       return NextResponse.json({ 
-        error: "Insufficient permissions, please check AWS IAM configuration" 
-      }, { status: 403 });
-    }
-    
-    if (error.name === 'ValidationException') {
+        error: `Invocation failed: ${error.message || 'Unknown error'}` 
+      }, { status: 500 });
+    } else {
       return NextResponse.json({ 
-        error: "Request parameter error" 
-      }, { status: 400 });
+        error: 'Invocation failed: Unknown error' 
+      }, { status: 500 });
     }
-    
-    return NextResponse.json({ 
-      error: `Invocation failed: ${error.message || 'Unknown error'}` 
-    }, { status: 500 });
   }
 }
