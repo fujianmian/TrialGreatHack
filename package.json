@@ -1,0 +1,25 @@
+{
+  "name": "eduai-frontend",
+  "version": "1.0.0",
+  "description": "AI-powered learning assistant frontend",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "serve": "npx http-server . -p 3000 -o",
+    "start": "npm run build && npm run serve"
+  },
+  "keywords": [
+    "ai",
+    "education",
+    "learning",
+    "typescript"
+  ],
+  "author": "EduAI Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.19.17",
+    "http-server": "^14.1.1",
+    "typescript": "^5.9.2"
+  }
+}

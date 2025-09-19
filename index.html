@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduAI - Ultimate Learning Assistant</title>
+    <meta name="description" content="Transform any content into personalized learning materials with our advanced AI assistant. Study smarter, not harder.">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        :root {
+            --primary: #4361ee;
+            --primary-dark: #3a56d4;
+            --secondary: #7209b7;
+            --accent: #f72585;
+            --success: #4cc9f0;
+            --dark: #2b2d42;
+            --light: #f8f9fa;
+            --gray: #6c757d;
+            --border: #dee2e6;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e6f0ff 100%);
+            color: var(--dark);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 15px 25px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .logo-text {
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .logo i {
+            font-size: 32px;
+            color: var(--primary);
+        }
+        
+        nav ul {
+            display: flex;
+            list-style: none;
+            gap: 25px;
+        }
+        
+        nav a {
+            text-decoration: none;
+            color: var(--dark);
+            font-weight: 600;
+            transition: all 0.3s;
+            padding: 8px 15px;
+            border-radius: 20px;
+        }
+        
+        nav a:hover, nav a.active {
+            color: var(--primary);
+            background: rgba(67, 97, 238, 0.1);
+        }
+        
+        .auth-buttons {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border-radius: 30px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .hero {
+            text-align: center;
+            padding: 60px 0;
+            margin-bottom: 40px;
+        }
+        
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1.2;
+        }
+        
+        .hero p {
+            font-size: 1.3rem;
+            color: var(--gray);
+            max-width: 800px;
+            margin: 0 auto 30px;
+        }
+        
+        .hero-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+        
+        .input-section, .output-section {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            border: 1px solid var(--border);
+        }
+        
+        .section-title {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .input-methods {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .input-method {
+            flex: 1;
+            min-width: 120px;
+            text-align: center;
+            padding: 18px 12px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .input-method:hover, .input-method.active {
+            border-color: var(--primary);
+            background: rgba(67, 97, 238, 0.05);
+            transform: translateY(-3px);
+        }
+        
+        .input-method i {
+            font-size: 26px;
+            margin-bottom: 12px;
+            color: var(--primary);
+        }
+        
+        .input-method p {
+            font-weight: 600;
+            font-size: 15px;
+        }
+        
+        .input-area {
+            margin-bottom: 25px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 180px;
+            padding: 20px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            resize: vertical;
+            font-size: 16px;
+            transition: all 0.3s;
+            line-height: 1.5;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+        }
+        
+        .output-options {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .output-option {
+            text-align: center;
+            padding: 20px 12px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .output-option:hover, .output-option.active {
+            border-color: var(--primary);
+            background: rgba(67, 97, 238, 0.05);
+            transform: translateY(-3px);
+        }
+        
+        .output-option i {
+            font-size: 26px;
+            margin-bottom: 12px;
+            color: var(--primary);
+        }
+        
+        .output-option p {
+            font-weight: 600;
+            font-size: 15px;
+        }
+        
+        .generate-btn {
+            text-align: center;
+            margin: 30px 0;
+        }
+        
+        .generate-btn .btn {
+            padding: 16px 45px;
+            font-size: 18px;
+            border-radius: 15px;
+        }
+        
+        .output-preview {
+            background: var(--light);
+            border-radius: 12px;
+            padding: 25px;
+            min-height: 220px;
+            margin-top: 25px;
+            border: 2px dashed var(--border);
+        }
+        
+        .learning-modes {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .learning-mode {
+            flex: 1;
+            text-align: center;
+            padding: 15px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .learning-mode:hover, .learning-mode.active {
+            border-color: var(--success);
+            background: rgba(76, 201, 240, 0.1);
+        }
+        
+        .learning-mode i {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: var(--success);
+        }
+        
+        .ai-assistant {
+            background: linear-gradient(135deg, #e6f7ff 0%, #f0e6ff 100%);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 25px 0;
+            border-left: 4px solid var(--accent);
+        }
+        
+        .ai-assistant-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .ai-assistant-header h3 {
+            color: var(--accent);
+            margin: 0;
+        }
+        
+        .ai-suggestions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .suggestion {
+            background: white;
+            padding: 12px 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        .suggestion:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .suggestion i {
+            color: var(--accent);
+        }
+        
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 25px;
+            margin-bottom: 50px;
+        }
+        
+        .feature {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s;
+            border: 1px solid var(--border);
+        }
+        
+        .feature:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        }
+        
+        .feature i {
+            font-size: 42px;
+            color: var(--primary);
+            margin-bottom: 20px;
+        }
+        
+        .feature h3 {
+            margin-bottom: 15px;
+            color: var(--primary);
+            font-size: 22px;
+        }
+        
+        .feature p {
+            color: var(--gray);
+            line-height: 1.5;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 40px 0;
+            color: var(--gray);
+            border-top: 1px solid var(--border);
+            margin-top: 50px;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .features {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .output-options {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 600px) {
+            .features {
+                grid-template-columns: 1fr;
+            }
+            
+            .output-options {
+                grid-template-columns: 1fr;
+            }
+            
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            
+            .hero p {
+                font-size: 1.1rem;
+            }
+            
+            header {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            nav ul {
+                gap: 15px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .auth-buttons {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .hero-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-brain"></i>
+                <span class="logo-text">EduAI</span>
+            </div>
+            
+            <nav>
+                <ul>
+                    <li><a href="#" class="active">Home</a></li>
+                    <li><a href="#">Features</a></li>
+                    <li><a href="#">How It Works</a></li>
+                    <li><a href="#">Pricing</a></li>
+                </ul>
+            </nav>
+            
+            <div class="auth-buttons">
+                <button class="btn btn-outline">Log In</button>
+                <button class="btn btn-primary">Sign Up</button>
+            </div>
+        </header>
+        
+        <section class="hero">
+            <h1>Smart Learning Powered by AI</h1>
+            <p>Transform any content into personalized learning materials with our advanced AI assistant. Study smarter, not harder.</p>
+            <div class="hero-buttons">
+                <button class="btn btn-primary"><i class="fas fa-bolt"></i> Try It Now</button>
+                <button class="btn btn-outline"><i class="fas fa-play-circle"></i> Watch Demo</button>
+            </div>
+        </section>
+        
+        <div class="main-content">
+            <div class="input-section">
+                <h2 class="section-title"><i class="fas fa-pencil-alt"></i> Your Learning Content</h2>
+                
+                <div class="input-methods">
+                    <div class="input-method active">
+                        <i class="fas fa-font"></i>
+                        <p>Text</p>
+                    </div>
+                    <div class="input-method">
+                        <i class="fas fa-file-upload"></i>
+                        <p>Upload</p>
+                    </div>
+                    <div class="input-method">
+                        <i class="fas fa-link"></i>
+                        <p>URL</p>
+                    </div>
+                    <div class="input-method">
+                        <i class="fas fa-microphone"></i>
+                        <p>Voice</p>
+                    </div>
+                </div>
+                
+                <div class="input-area">
+                    <textarea placeholder="Paste your text, article, or any content you want to learn from...">Quantum computing is an area of computing focused on developing computer technology based on the principles of quantum theory. Quantum computers use quantum bits or qubits, which can represent both 0 and 1 simultaneously, unlike classical bits. This allows quantum computers to perform certain calculations much faster than traditional computers.</textarea>
+                </div>
+                
+                <div class="learning-modes">
+                    <div class="learning-mode active">
+                        <i class="fas fa-graduation-cap"></i>
+                        <p>Study Mode</p>
+                    </div>
+                    <div class="learning-mode">
+                        <i class="fas fa-trophy"></i>
+                        <p>Exam Prep</p>
+                    </div>
+                    <div class="learning-mode">
+                        <i class="fas fa-lightbulb"></i>
+                        <p>Quick Learn</p>
+                    </div>
+                </div>
+                
+                <div class="ai-assistant">
+                    <div class="ai-assistant-header">
+                        <i class="fas fa-robot"></i>
+                        <h3>AI Assistant Suggestions</h3>
+                    </div>
+                    <div class="ai-suggestions">
+                        <div class="suggestion">
+                            <i class="fas fa-lightbulb"></i>
+                            <span>Simplify for beginners</span>
+                        </div>
+                        <div class="suggestion">
+                            <i class="fas fa-lightbulb"></i>
+                            <span>Add real-world examples</span>
+                        </div>
+                        <div class="suggestion">
+                            <i class="fas fa-lightbulb"></i>
+                            <span>Create a comparison chart</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="output-section">
+                <h2 class="section-title"><i class="fas fa-magic"></i> Create Learning Materials</h2>
+                
+                <div class="output-options">
+                    <div class="output-option active">
+                        <i class="fas fa-sticky-note"></i>
+                        <p>Smart Notes</p>
+                    </div>
+                    <div class="output-option">
+                        <i class="fas fa-video"></i>
+                        <p>Explainer Video</p>
+                    </div>
+                    <div class="output-option">
+                        <i class="fas fa-layer-group"></i>
+                        <p>Flashcards</p>
+                    </div>
+                    <div class="output-option">
+                        <i class="fas fa-brain"></i>
+                        <p>Mind Map</p>
+                    </div>
+                    <div class="output-option">
+                        <i class="fas fa-question-circle"></i>
+                        <p>Practice Quiz</p>
+                    </div>
+                    <div class="output-option">
+                        <i class="fas fa-chart-bar"></i>
+                        <p>Visual Summary</p>
+                    </div>
+                </div>
+                
+                
+                <div class="generate-btn">
+                    <button class="btn btn-primary">
+                        <i class="fas fa-bolt"></i> Generate Learning Materials
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="output-preview">
+            <h2 class="section-title"><i class="fas fa-eye"></i> Preview</h2>
+            <p>Your generated content will appear here. Select an output option and click "Generate" to see the magic happen!</p>
+        </div>
+        
+        <h2 style="text-align: center; margin: 50px 0 30px; color: var(--primary); font-size: 2.2rem;">Why EduAI Stands Out</h2>
+        
+        <div class="features">
+            <div class="feature">
+                <i class="fas fa-brain-circuit"></i>
+                <h3>Adaptive Learning</h3>
+                <p>Our AI adjusts content difficulty based on your understanding and progress</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-robot"></i>
+                <h3>AI Tutor Mode</h3>
+                <p>Get personalized explanations and answers to your questions 24/7</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-vr-cardboard"></i>
+                <h3>Immersive Learning</h3>
+                <p>Experience complex concepts through interactive 3D models and simulations</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-microphone"></i>
+                <h3>Voice Interaction</h3>
+                <p>Ask questions and get spoken explanations just like a personal tutor</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-chart-network"></i>
+                <h3>Knowledge Mapping</h3>
+                <p>Visualize how concepts connect to build deeper understanding</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-gamepad"></i>
+                <h3>Gamified Learning</h3>
+                <p>Earn points and badges as you master topics and complete challenges</p>
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        <p>© 2024 EduAI. All rights reserved.</p>
+        <p>Transforming education through artificial intelligence</p>
+    </footer>
+
+    <!-- Load the compiled TypeScript -->
+    <script type="module" src="dist/index.js"></script>
+</body>
+</html>
