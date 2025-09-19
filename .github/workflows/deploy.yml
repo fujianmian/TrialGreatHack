@@ -51,5 +51,11 @@ jobs:
 
       - name: Update ECS Service to use new task definition
         run: |
-                # Use the new task definition ARN instead of fixed version
-                aws ecs update-service --cluster my-ecs-cluster --service nextjs-task-service-v0fg7npw --task-definition ${{ steps.task-def.outputs.taskdef_arn }} --force-new-deployment
+            echo "Updating ECS service with new task definition..."
+            aws ecs update-service \
+            --cluster my-ecs-cluster \
+            --service nextjs-task-service-v0fg7npw \
+            --task-definition $TASKDEF_ARN \
+            --force-new-deployment
+        env:
+            TASKDEF_ARN: ${{ steps.task-def.outputs.taskdef_arn }}
