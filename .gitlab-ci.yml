@@ -10,7 +10,7 @@ variables:
   ECR_REPOSITORY: $APP_NAME
   IMAGE_TAG: $CI_COMMIT_SHA
 
-# 1️⃣ Install dependencies & build Next.js
+# 1️⃣ Install dependencies & build Next.js //to trigger
 build-app:
   stage: build
   image: node:18
