@@ -1,0 +1,62 @@
+name: Deploy to ECS
+
+on:
+  push:
+    branches:
+      - main  # 监听 main 分支 push
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-5
+
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region ap-southeast-5 | docker login --username AWS --password-stdin 268060978153.dkr.ecr.ap-southeast-5.amazonaws.com
+
+      - name: Build Docker image
+        run: |
+          docker build --no-cache -t myapp:${{ github.sha }} .
+          docker tag myapp:${{ github.sha }} 268060978153.dkr.ecr.ap-southeast-5.amazonaws.com/greataihack1:${{ github.sha }}
+
+      - name: Push Docker image to ECR
+        run: |
+          docker push 268060978153.dkr.ecr.ap-southeast-5.amazonaws.com/greataihack1:${{ github.sha }}
+
+      - id: task-def
+        name: Update ECS task definition with new image
+        run: |
+            aws ecs describe-task-definition --task-definition nextjs-task:1 \
+            --query "taskDefinition.{family:family, taskRoleArn:taskRoleArn, executionRoleArn:executionRoleArn, networkMode:networkMode, containerDefinitions:containerDefinitions, volumes:volumes, placementConstraints:placementConstraints, requiresCompatibilities:requiresCompatibilities, cpu:cpu, memory:memory, tags:tags, pidMode:pidMode, ipcMode:ipcMode, proxyConfiguration:proxyConfiguration, inferenceAccelerators:inferenceAccelerators, ephemeralStorage:ephemeralStorage, runtimePlatform:runtimePlatform, enableFaultInjection:enableFaultInjection}" \
+            --output json > taskdef.json
+
+            NEW_IMAGE="268060978153.dkr.ecr.ap-southeast-5.amazonaws.com/greataihack1:${{ github.sha }}"
+            jq --arg IMAGE "$NEW_IMAGE" '
+              del(.tags, .pidMode, .ipcMode, .proxyConfiguration, .inferenceAccelerators, .ephemeralStorage) |
+              .containerDefinitions[0].image=$IMAGE
+            ' taskdef.json > new-taskdef.json
+
+            TASKDEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json | jq -r '.taskDefinition.taskDefinitionArn')
+            echo "New task definition ARN: $TASKDEF_ARN"
+
+            # This correctly sets the GitHub Actions output
+            echo "taskdef_arn=$TASKDEF_ARN" >> $GITHUB_OUTPUT
+
+      - name: Update ECS Service to use new task definition
+        run: |
+            echo "Updating ECS service with new task definition..."
+            aws ecs update-service \
+            --cluster my-ecs-cluster \
+            --service nextjs-task-service-v0fg7npw \
+            --task-definition "${{ steps.task-def.outputs.taskdef_arn }}" \
+            --force-new-deployment

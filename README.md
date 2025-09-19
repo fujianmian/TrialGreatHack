@@ -1,37 +1,44 @@
-# EduAI - TypeScript Frontend
+# EduAI - Great AI Hack Frontend
 
-A modern, type-safe frontend for the EduAI learning assistant built with TypeScript.
+A modern, type-safe frontend for the EduAI learning assistant built with TypeScript and Next.js for the Great AI Hack competition.
 
 ## 🚀 Features
 
 - **TypeScript**: Full type safety and modern JavaScript features
+- **Next.js**: React framework with server-side rendering and optimization
 - **Modular Architecture**: Clean separation of concerns with classes and interfaces
 - **Responsive Design**: Mobile-first approach with modern CSS
 - **Accessibility**: ARIA labels, keyboard navigation, and screen reader support
 - **Performance**: Optimized DOM manipulation and event handling
 - **Error Handling**: Comprehensive error handling and user feedback
+- **AI Integration**: Ready for AI-powered learning content generation
 
 ## 📁 Project Structure
 
 ```
-hack/
+TrialGreatHack/
 ├── src/
+│   ├── app/                    # Next.js App Router
+│   │   ├── layout.tsx         # Root layout
+│   │   ├── page.tsx           # Home page
+│   │   └── globals.css        # Global styles
 │   ├── types/
-│   │   └── index.ts          # TypeScript interfaces and types
-│   ├── app.ts                # Main application class
-│   └── index.ts              # Application entry point
-├── dist/                     # Compiled output (generated)
-├── index.html                # HTML template
-├── tsconfig.json             # TypeScript configuration
-├── package.json              # Dependencies and scripts
-├── build.js                  # Build script
-└── README.md                 # This file
+│   │   └── index.ts           # TypeScript interfaces and types
+│   ├── app.ts                 # Main application class
+│   └── index.ts               # Application entry point
+├── public/                    # Static assets
+├── dist/                      # Compiled output (standalone)
+├── index.html                 # Standalone HTML template
+├── tsconfig.json              # TypeScript configuration
+├── next.config.ts             # Next.js configuration
+├── package.json               # Dependencies and scripts
+└── README.md                  # This file
 ```
 
 ## 🛠️ Development Setup
 
 ### Prerequisites
-- Node.js (v16 or higher)
+- Node.js (v18 or higher)
 - npm or yarn
 
 ### Installation
@@ -41,29 +48,38 @@ hack/
    npm install
    ```
 
-2. **Build the project:**
-   ```bash
-   npm run build
-   ```
-
-3. **Start development server:**
+2. **Run Next.js development server:**
    ```bash
    npm run dev
    ```
 
-4. **Serve the application:**
+3. **Or run standalone TypeScript version:**
    ```bash
-   npm run serve
+   npm run build-standalone
+   npm run serve-standalone
    ```
 
 ## 🎯 Available Scripts
 
-- `npm run build` - Compile TypeScript to JavaScript
-- `npm run dev` - Watch mode for development
-- `npm run serve` - Start local server
-- `npm start` - Build and serve the application
+### Next.js Commands
+- `npm run dev` - Start Next.js development server with Turbopack
+- `npm run build` - Build Next.js application for production
+- `npm start` - Start production Next.js server
+- `npm run lint` - Run ESLint
+
+### Standalone TypeScript Commands
+- `npm run build-standalone` - Compile TypeScript to JavaScript
+- `npm run serve-standalone` - Start local server for standalone version
 
 ## 🏗️ Architecture
+
+### Next.js Integration
+This project combines the power of Next.js with a standalone TypeScript frontend:
+
+- **Next.js App Router**: Modern React routing and server components
+- **TypeScript**: Full type safety throughout the application
+- **Tailwind CSS**: Utility-first CSS framework
+- **Standalone Mode**: Can run independently without Next.js
 
 ### TypeScript Classes
 
@@ -73,15 +89,14 @@ Main application class that manages:
 - DOM element caching
 - Event handling
 - UI updates
-- Timer functionality
 - Content generation
+- AI integration
 
 #### Type Definitions
 - `AppState` - Complete application state
 - `InputMethod` - Input method configuration
 - `OutputOption` - Output format options
 - `LearningMode` - Learning mode settings
-- `TimerState` - Study timer state
 - `GeneratedContent` - Generated content structure
 
 ### Key Features
@@ -90,9 +105,9 @@ Main application class that manages:
 2. **Event Handling**: Type-safe event listeners with proper cleanup
 3. **DOM Caching**: Efficient element selection and caching
 4. **Error Handling**: Comprehensive error handling with user feedback
-5. **Timer Functionality**: Study timer with start/pause/reset
-6. **Content Generation**: Simulated AI content generation
-7. **Responsive UI**: Mobile-first responsive design
+5. **Content Generation**: AI-powered content generation simulation
+6. **Responsive UI**: Mobile-first responsive design
+7. **Accessibility**: Full keyboard navigation and screen reader support
 
 ## 🎨 Styling
 
@@ -116,21 +131,35 @@ The application uses CSS custom properties (variables) for consistent theming:
 - Source maps for debugging
 - Declaration files generated
 
-### Build Configuration
-- Output directory: `dist/`
-- Source directory: `src/`
-- Module system: ES2020
+### Next.js Configuration (`next.config.ts`)
+- Turbopack enabled for faster builds
+- TypeScript support
+- Optimized for production
 
 ## 🚀 Deployment
+
+### Next.js Deployment (Recommended)
 
 1. **Build for production:**
    ```bash
    npm run build
    ```
 
-2. **Deploy the `dist/` directory** to your web server
+2. **Deploy to Vercel:**
+   ```bash
+   npx vercel
+   ```
 
-3. **Ensure your server serves `.js` files with proper MIME type**
+3. **Or deploy to any Node.js hosting service**
+
+### Standalone Deployment
+
+1. **Build standalone version:**
+   ```bash
+   npm run build-standalone
+   ```
+
+2. **Deploy the `dist/` directory** to any static hosting service
 
 ## 🐛 Debugging
 
@@ -166,6 +195,14 @@ For issues and questions:
 3. Verify TypeScript compilation is successful
 4. Check that the HTML file loads the correct JavaScript bundle
 
+## 🏆 Great AI Hack
+
+This project was created for the Great AI Hack competition, showcasing:
+- Modern TypeScript development practices
+- AI-powered learning assistant interface
+- Responsive design and accessibility
+- Clean architecture and code organization
+
 ---
 
-**Built with ❤️ using TypeScript**
+**Built with ❤️ using TypeScript and Next.js for the Great AI Hack**

@@ -1,0 +1,53 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  IMAGE_NAME: "268060978153.dkr.ecr.ap-southeast-5.amazonaws.com/greataihack1"
+  NODE_ENV: "production"
+  AWS_REGION: "ap-southeast-5"
+
+# -----------------------------
+# Build & Push Docker Image
+# -----------------------------
+build:
+  stage: build
+  image: docker:24
+  services:
+    - name: docker:24-dind
+      alias: docker-dind
+  variables:
+    DOCKER_DRIVER: overlay2
+  before_script:
+    - apk add --no-cache python3 py3-pip bash jq aws-cli
+    - aws --version
+    - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin 268060978153.dkr.ecr.$AWS_REGION.amazonaws.com
+  script:
+    - echo "Building Docker image..."
+    - docker build -t $IMAGE_NAME:$IMAGE_TAG .
+    - docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
+    - echo "Pushing Docker image..."
+    - docker push $IMAGE_NAME:$IMAGE_TAG
+    - docker push $IMAGE_NAME:latest
+
+# -----------------------------
+# Deploy to ECS tigger
+# -----------------------------
+deploy:
+  stage: deploy
+  image: docker:24
+  services:
+    - name: docker:24-dind
+      alias: docker-dind
+  before_script:
+    - apk add --no-cache python3 py3-pip bash jq aws-cli
+  script:
+    - |
+      echo "Deploying to ECS..."
+      aws ecs update-service \
+        --cluster my-ecs-cluster \
+        --service my-ecs-service \
+        --force-new-deployment \
+        --region $AWS_REGION
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'

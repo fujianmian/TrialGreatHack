@@ -1,25 +1,31 @@
 {
-  "name": "eduai-frontend",
+  "name": "eduai-greataihack",
   "version": "1.0.0",
-  "description": "AI-powered learning assistant frontend",
-  "main": "dist/index.js",
+  "description": "AI-powered learning assistant frontend - Great AI Hack",
+  "private": true,
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "serve": "npx http-server . -p 3000 -o",
-    "start": "npm run build && npm run serve"
+    "dev": "next dev --turbopack",
+    "build": "next build --turbopack",
+    "start": "next start",
+    "lint": "eslint",
+    "build-standalone": "tsc",
+    "serve-standalone": "npx http-server . -p 3000 -o"
   },
-  "keywords": [
-    "ai",
-    "education",
-    "learning",
-    "typescript"
-  ],
-  "author": "EduAI Team",
-  "license": "MIT",
+  "dependencies": {
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "next": "15.5.3"
+  },
   "devDependencies": {
-    "@types/node": "^20.19.17",
-    "http-server": "^14.1.1",
-    "typescript": "^5.9.2"
+    "typescript": "^5",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@tailwindcss/postcss": "^4",
+    "tailwindcss": "^4",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.3",
+    "@eslint/eslintrc": "^3",
+    "http-server": "^14.1.1"
   }
 }
