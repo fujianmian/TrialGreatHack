@@ -1,55 +1,88 @@
 stages:
-  - build
   - docker
   - deploy
 
 variables:
   APP_NAME: nextjs-app
-  AWS_REGION: ap-southeast-1              # change if needed
+  ECR_REPOSITORY: $ECR_REPOSITORY        # set in GitLab CI variables
+  AWS_REGION: $AWS_REGION
   ECR_REGISTRY: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-  ECR_REPOSITORY: $APP_NAME
-  IMAGE_TAG: $CI_COMMIT_SHA
+  IMAGE_TAG: $CI_COMMIT_SHORT_SHA
+  DOCKER_TLS_CERTDIR: ""    # needed for docker:dind in many runners
 
-# 1️⃣ Install dependencies & build Next.js //to trigger
-build-app:
-  stage: build
-  image: node:18
-  script:
-    - npm ci
-    - npm run build
-  artifacts:
-    paths:
-      - .next
-      - node_modules
-    expire_in: 1h
-
-# 2️⃣ Build & push Docker image to ECR
+# Build image and push to ECR
 docker-build:
   stage: docker
   image: docker:24
   services:
-    - docker:24-dind
+    - name: docker:24-dind
+      alias: docker-dind
+  variables:
+    DOCKER_DRIVER: overlay2
   before_script:
-    - apk add --no-cache python3 py3-pip bash
-    - pip3 install awscli
+    # install awscli (alpine) - if your runner base isn't alpine, change to apt-get
+    - apk add --no-cache python3 py3-pip jq bash || true
+    - pip3 install --no-cache-dir awscli || true
     - aws --version
-    # login to AWS ECR
     - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+    - |
+      # ensure ECR repo exists (optional; requires CreateRepository permission)
+      if ! aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" --region "$AWS_REGION" >/dev/null 2>&1; then
+        aws ecr create-repository --repository-name "$ECR_REPOSITORY" --region "$AWS_REGION" || true
+      fi
   script:
     - docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
     - docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
     - docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+  only:
+    - main
 
-# 3️⃣ Deploy to ECS
 deploy-ecs:
   stage: deploy
-  image: amazon/aws-cli:2.15.7
+  image: amazon/aws-cli:2
+  before_script:
+    - apk add --no-cache jq || true
   script:
-    # update ECS service with new image
-    - aws ecs update-service \
+    - |
+      # create a minimal task definition JSON with the new image
+      cat > taskdef.json <<EOF
+      {
+        "family": "$TASK_FAMILY",
+        "networkMode": "awsvpc",
+        "executionRoleArn": "$TASK_EXECUTION_ROLE",
+        "taskRoleArn": "$TASK_ROLE",
+        "requiresCompatibilities": ["FARGATE"],
+        "cpu": "512",
+        "memory": "1024",
+        "containerDefinitions": [
+          {
+            "name": "$APP_NAME",
+            "image": "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG",
+            "portMappings": [{"containerPort": 3000, "protocol": "tcp"}],
+            "essential": true,
+            "logConfiguration": {
+              "logDriver": "awslogs",
+              "options": {
+                "awslogs-group": "$AWS_LOG_GROUP",
+                "awslogs-region": "$AWS_REGION",
+                "awslogs-stream-prefix": "$APP_NAME"
+              }
+            }
+          }
+        ]
+      }
+      EOF
+    - >
+      TASK_DEF_ARN=$(aws ecs register-task-definition \
+        --cli-input-json file://taskdef.json \
+        --query 'taskDefinition.taskDefinitionArn' --output text --region $AWS_REGION)
+    - echo "Registered task definition: $TASK_DEF_ARN"
+    - |
+      aws ecs update-service \
         --cluster $ECS_CLUSTER \
         --service $ECS_SERVICE \
+        --task-definition $TASK_DEF_ARN \
         --force-new-deployment \
         --region $AWS_REGION
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'   # deploy only on main branch
+    - if: '$CI_COMMIT_BRANCH == "main"'
