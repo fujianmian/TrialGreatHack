@@ -1,58 +1,101 @@
 import { NextResponse } from "next/server";
 import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
 
-// 初始化 Bedrock 客户端
+// Initialize Bedrock client
 const client = new BedrockRuntimeClient({
-  region: "ap-southeast-1", // 记得改成支持的区域
+  region: "us-east-1", // Ensure the region matches
 });
 
 export async function POST(req: Request) {
-  const body = await req.json();
-  const text = body.text || "";
-
-  // 构建 prompt
-  const prompt = `
-  请阅读以下文章，并找出其中10个最深奥或不常见的词语。
-  对每个词语，给出简明的解释。
-  以JSON数组形式返回，格式如下：
-  [
-    {"word": "词1", "meaning": "解释1"},
-    {"word": "词2", "meaning": "解释2"}
-  ]
-
-  文章内容：
-  ${text}
-  `;
-
-  const command = new InvokeModelCommand({
-    modelId: "arn:aws:bedrock:ap-southeast-1:268060978153:inference-profile/apac.amazon.nova-pro-v1:0",  // ✅ 用 model 短名
-    contentType: "application/json",
-    accept: "application/json",
-    body: JSON.stringify({
-      inputText: prompt,     // ✅ Nova 模型用 inputText
-      textGenerationConfig: {
-        maxTokenCount: 500,
-        temperature: 0.7,
-      },
-    }),
-  });
-
   try {
+    const body = await req.json();
+    const text = body.text || "";
+
+    if (!text.trim()) {
+      return NextResponse.json({ error: "Article content cannot be empty" }, { status: 400 });
+    }
+
+    // Build prompt
+    const prompt = `Please read the following article and identify 10 of the most obscure or uncommon words.
+For each word, provide a concise explanation.
+Return as a JSON array in the following format:
+[
+  {"word": "word1", "meaning": "explanation1"},
+  {"word": "word2", "meaning": "explanation2"}
+]
+
+Article content:
+${text}`;
+
+    const command = new InvokeModelCommand({
+      modelId: "amazon.nova-pro-v1:0",
+      contentType: "application/json",
+      accept: "application/json",
+      body: JSON.stringify({
+        messages: [
+          {
+            role: "user",
+            content: [
+              { text: prompt }
+            ]
+          }
+        ],
+        inferenceConfig: {
+          maxTokens: 500,
+          temperature: 0.7,
+        }
+      }),
+    });
+
+    console.log("Sending request to Bedrock...");
     const response = await client.send(command);
 
     const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-    const resultText = responseBody.outputText; // Claude 返回的文本
+
+    // ✅ Extract model reply text
+    const resultText = responseBody.output?.message?.content?.[0]?.text || "";
+
+    // Debug log
+    console.log("Raw AI text:", resultText);
 
     let parsedResult;
     try {
-      parsedResult = JSON.parse(resultText); // 转成 JSON
-    } catch {
-      parsedResult = [{ word: "解析失败", meaning: resultText }];
+      // Try to extract JSON array from text
+      const jsonMatch = resultText.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        parsedResult = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error("No JSON found in response");
+      }
+    } catch (parseError) {
+      console.error("JSON parse error:", parseError);
+      parsedResult = [{
+        word: "Parse failed",
+        meaning: resultText.substring(0, 200) + "..."
+      }];
     }
 
     return NextResponse.json({ result: parsedResult });
-  } catch (error) {
+
+    
+  } catch (error: any) {
     console.error("Bedrock error:", error);
-    return NextResponse.json({ error: "调用失败" }, { status: 500 });
+    
+    // More detailed error handling
+    if (error.name === 'AccessDeniedException') {
+      return NextResponse.json({ 
+        error: "Insufficient permissions, please check AWS IAM configuration" 
+      }, { status: 403 });
+    }
+    
+    if (error.name === 'ValidationException') {
+      return NextResponse.json({ 
+        error: "Request parameter error" 
+      }, { status: 400 });
+    }
+    
+    return NextResponse.json({ 
+      error: `Invocation failed: ${error.message || 'Unknown error'}` 
+    }, { status: 500 });
   }
 }
