@@ -1,6 +1,6 @@
 deploy-ecs:
   stage: deploy
-  image: amazon/aws-cli:2
+  image: amazon/aws-cli:latest
   before_script:
     - apk add --no-cache jq || true
   script:
