@@ -41,7 +41,10 @@ jobs:
             --output json > taskdef.json
 
             NEW_IMAGE="268060978153.dkr.ecr.ap-southeast-5.amazonaws.com/greataihack1:${{ github.sha }}"
-            jq --arg IMAGE "$NEW_IMAGE" '.containerDefinitions[0].image=$IMAGE' taskdef.json > new-taskdef.json
+            jq --arg IMAGE "$NEW_IMAGE" '
+              del(.tags, .pidMode, .ipcMode, .proxyConfiguration, .inferenceAccelerators, .ephemeralStorage) |
+              .containerDefinitions[0].image=$IMAGE
+            ' taskdef.json > new-taskdef.json
 
             TASKDEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json | jq -r '.taskDefinition.taskDefinitionArn')
             echo "New task definition ARN: $TASKDEF_ARN"
