@@ -36,7 +36,6 @@ jobs:
       - id: task-def
         name: Update ECS task definition with new image
         run: |
-            # Filter fields when describing the task
             aws ecs describe-task-definition --task-definition nextjs-task:1 \
             --query "taskDefinition.{family:family, taskRoleArn:taskRoleArn, executionRoleArn:executionRoleArn, networkMode:networkMode, containerDefinitions:containerDefinitions, volumes:volumes, placementConstraints:placementConstraints, requiresCompatibilities:requiresCompatibilities, cpu:cpu, memory:memory, tags:tags, pidMode:pidMode, ipcMode:ipcMode, proxyConfiguration:proxyConfiguration, inferenceAccelerators:inferenceAccelerators, ephemeralStorage:ephemeralStorage, runtimePlatform:runtimePlatform, enableFaultInjection:enableFaultInjection}" \
             --output json > taskdef.json
@@ -47,6 +46,7 @@ jobs:
             TASKDEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json | jq -r '.taskDefinition.taskDefinitionArn')
             echo "New task definition ARN: $TASKDEF_ARN"
 
+            # This correctly sets the GitHub Actions output
             echo "taskdef_arn=$TASKDEF_ARN" >> $GITHUB_OUTPUT
 
       - name: Update ECS Service to use new task definition
@@ -55,7 +55,5 @@ jobs:
             aws ecs update-service \
             --cluster my-ecs-cluster \
             --service nextjs-task-service-v0fg7npw \
-            --task-definition $TASKDEF_ARN \
+            --task-definition "${{ steps.task-def.outputs.taskdef_arn }}" \
             --force-new-deployment
-        env:
-            TASKDEF_ARN: ${{ steps.task-def.outputs.taskdef_arn }}
