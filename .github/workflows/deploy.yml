@@ -55,6 +55,8 @@ jobs:
       - name: Update ECS Service to use new task definition
         run: |
             echo "Updating ECS service with new task definition..."
+            echo $AWS_REGION
+            echo $AWS_DEFAULT_REGION
             aws ecs update-service \
             --cluster my-ecs-cluster \
             --service nextjs-task-service-v0fg7npw \
