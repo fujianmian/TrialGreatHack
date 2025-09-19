@@ -36,16 +36,20 @@ jobs:
       - id: task-def
         name: Update ECS task definition with new image
         run: |
-          aws ecs describe-task-definition --task-definition nextjs-task:1 > taskdef.json
+            # Filter fields when describing the task
+            aws ecs describe-task-definition --task-definition nextjs-task:1 \
+            --query "taskDefinition.{family:family, taskRoleArn:taskRoleArn, executionRoleArn:executionRoleArn, networkMode:networkMode, containerDefinitions:containerDefinitions, volumes:volumes, placementConstraints:placementConstraints, requiresCompatibilities:requiresCompatibilities, cpu:cpu, memory:memory, tags:tags, pidMode:pidMode, ipcMode:ipcMode, proxyConfiguration:proxyConfiguration, inferenceAccelerators:inferenceAccelerators, ephemeralStorage:ephemeralStorage, runtimePlatform:runtimePlatform, enableFaultInjection:enableFaultInjection}" \
+            --output json > taskdef.json
 
-          NEW_IMAGE="268060978153.dkr.ecr.ap-southeast-5.amazonaws.com/greataihack1:${{ github.sha }}"
-          jq --arg IMAGE "$NEW_IMAGE" '.taskDefinition.containerDefinitions[0].image=$IMAGE | .taskDefinition | del(.status,.revision,.taskDefinitionArn,.requiresAttributes,.compatibilities)' taskdef.json > new-taskdef.json
+            NEW_IMAGE="268060978153.dkr.ecr.ap-southeast-5.amazonaws.com/greataihack1:${{ github.sha }}"
+            jq --arg IMAGE "$NEW_IMAGE" '.containerDefinitions[0].image=$IMAGE' taskdef.json > new-taskdef.json
 
-          TASKDEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json | jq -r '.taskDefinition.taskDefinitionArn')
-          echo "New task definition ARN: $TASKDEF_ARN"
+            TASKDEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json | jq -r '.taskDefinition.taskDefinitionArn')
+            echo "New task definition ARN: $TASKDEF_ARN"
 
-          echo "taskdef_arn=$TASKDEF_ARN" >> $GITHUB_OUTPUT
+            echo "taskdef_arn=$TASKDEF_ARN" >> $GITHUB_OUTPUT
 
       - name: Update ECS Service to use new task definition
         run: |
-          aws ecs update-service --cluster my-ecs-cluster --service nextjs-task-service-v0fg7npw --task-definition nextjs-task:1 --force-new-deployment
+                # Use the new task definition ARN instead of fixed version
+                aws ecs update-service --cluster my-ecs-cluster --service nextjs-task-service-v0fg7npw --task-definition ${{ steps.task-def.outputs.taskdef_arn }} --force-new-deployment
