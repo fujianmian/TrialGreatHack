@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { BedrockClient } from "@aws-sdk/client-bedrock";
 
 export async function POST(req: Request) {
   try {
@@ -132,11 +133,15 @@ function isUnimportantWord(word: string): boolean {
 async function generateAIQuiz(text: string, questionCount: number, difficulty: string) {
   console.log("🤖 Attempting AWS Bedrock AI generation for quiz...");
   console.log("🔍 Environment check:");
-  console.log("AWS_REGION:", process.env.AWS_REGION);
-  console.log("AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID ? "✅ Set" : "❌ Not set");
-  console.log("AWS_SECRET_ACCESS_KEY:", process.env.AWS_SECRET_ACCESS_KEY ? "✅ Set" : "❌ Not set");
-  
-  // List of models to try in order of preference
+  if (process.env.ECS_CONTAINER_METADATA_URI || process.env.ECS_CONTAINER_METADATA_URI_V4) {
+    console.log("🏢 Running in ECS - using Task Role for credentials");
+  } else {
+    console.log("🏠 Running locally - using environment variables for credentials");
+    console.log("AWS_REGION:", process.env.AWS_REGION);
+    console.log("AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID ? "✅ Set" : "❌ Not set");
+    console.log("AWS_SECRET_ACCESS_KEY:", process.env.AWS_SECRET_ACCESS_KEY ? "✅ Set" : "❌ Not set");
+  }
+  // List of models to try in order of preferenceff
   // Using Amazon Nova Pro as primary model with fallbacks
   const modelsToTry = [
     'amazon.nova-pro-v1:0',
@@ -151,13 +156,31 @@ async function generateAIQuiz(text: string, questionCount: number, difficulty: s
     // Dynamic import to handle potential module not found errors
     const { BedrockRuntimeClient, InvokeModelCommand } = await import('@aws-sdk/client-bedrock-runtime');
     
-    const client = new BedrockRuntimeClient({
-      region: process.env.AWS_REGION || 'us-east-1',
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-      },
-    });
+    // const client = new BedrockRuntimeClient({
+    //   region: 'us-east-1',
+    //   credentials: {
+    //     accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+    //     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+    //   },
+    // });
+
+    function createBedrockClient() {
+      if (process.env.ECS_CONTAINER_METADATA_URI || process.env.ECS_CONTAINER_METADATA_URI_V4) {
+        // Running in ECS → rely on Task Role automatically
+        return new BedrockRuntimeClient({ region: "ap-southeast-5" });
+      } else {
+        // Running locally → use env credentials
+        return new BedrockRuntimeClient({
+          region: "us-east-1", // or your preferred region
+          credentials: {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "",
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "",
+          },
+        });
+      }
+    }
+
+    const client = createBedrockClient();
 
     const prompt = `Please analyze the following text and create exactly ${questionCount} quiz questions for testing understanding at ${difficulty} level.
 
