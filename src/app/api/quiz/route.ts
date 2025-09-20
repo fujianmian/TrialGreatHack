@@ -165,12 +165,16 @@ async function generateAIQuiz(text: string, questionCount: number, difficulty: s
     // });
 
     function createBedrockClient() {
+      console.log("ECS_CONTAINER_METADATA_URI", process.env.ECS_CONTAINER_METADATA_URI);
+      console.log("ECS_CONTAINER_METADATA_URI_V4", process.env.ECS_CONTAINER_METADATA_URI_V4);
+
       if (process.env.ECS_CONTAINER_METADATA_URI || process.env.ECS_CONTAINER_METADATA_URI_V4) {
         // Running in ECS → rely on Task Role automatically
         console.log("able to check LOCAL OR ECSSSSSSSSSSSSSSSSSSSSs");
         return new BedrockRuntimeClient({ region: "us-east-1" });
       } else {
         // Running locally → use env credentials
+        console.log("not able to check LOCAL OR ECSSSSSSSSSSSSSSSSSSSSs");
         return new BedrockRuntimeClient({
           region: "us-east-1", // or your preferred region
           credentials: {
