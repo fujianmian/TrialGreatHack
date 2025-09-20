@@ -199,7 +199,7 @@ ${text}`;
       try {
         console.log(`🔄 Trying model: ${modelId}`);
         
-        // Different request format for Amazon Nova vs Anthropic Claude
+        // Different request format for Amazon Nova vs Anthropic Claudevv
         let requestBody;
         if (modelId.startsWith('amazon.nova')) {
           // Amazon Nova format - content must be array of objects with text property
