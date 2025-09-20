@@ -22,19 +22,32 @@ interface MindMapResponse {
 }
 
 interface TextToMapProps {
-  inputText: string;
-  onBack: () => void;
+  inputText?: string;
+  searchParams?: Promise<{ text?: string }>;
+  onBack?: () => void;
 }
 
-export default function TextToMap({ inputText, onBack }: TextToMapProps) {
+export default function TextToMap({ inputText, searchParams, onBack }: TextToMapProps) {
   const [mindMap, setMindMap] = useState<MindMapResponse | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  // Removed dragging state - circles will stay fixed
+  const [urlText, setUrlText] = useState<string>('');
+
+  // Handle searchParams
+  useEffect(() => {
+    if (searchParams) {
+      searchParams.then(params => {
+        setUrlText(params.text || '');
+      });
+    }
+  }, [searchParams]);
+
+  // Determine the final input text
+  const finalInputText = inputText || urlText;
 
   const generateMindMap = useCallback(async () => {
     setIsGenerating(true);
@@ -46,7 +59,7 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ text: inputText }),
+        body: JSON.stringify({ text: finalInputText }),
       });
 
       if (!response.ok) {
@@ -54,13 +67,19 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
       }
 
       const data = await response.json();
+      
+      // Validate the response structure
+      if (data.result && data.result.nodes && Array.isArray(data.result.nodes)) {
       setMindMap(data.result);
+      } else {
+        throw new Error('Invalid mindmap data structure received');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsGenerating(false);
     }
-  }, [inputText]);
+  }, [finalInputText]);
 
   const getNodeColor = (level: number) => {
     const colors = [
@@ -75,10 +94,10 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
   };
 
   useEffect(() => {
-    if (inputText.trim()) {
+    if (finalInputText && finalInputText.trim()) {
       generateMindMap();
     }
-  }, [inputText, generateMindMap]);
+  }, [finalInputText, generateMindMap]);
 
   const getTextSize = (level: number) => {
     // All nodes same text size regardless of level
@@ -86,16 +105,18 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
   };
 
   const getNodeSize = (level: number) => {
-    // All nodes same circular size regardless of level
-    return { radius: 60 };
+    // All nodes same circular size regardless of level - increased size for better text fitting
+    return { radius: 80 };
   };
 
   const getMaxTextLength = (level: number) => {
-    // All nodes same text length limit regardless of level
-    return 25;
+    // All nodes same text length limit regardless of level - increased for larger circles
+    return 35;
   };
 
   const fitTextToNode = (text: string, level: number) => {
+    if (!text) return { text: '', fontSize: getTextSize(level) };
+    
     const nodeSize = getNodeSize(level);
     const maxLength = getMaxTextLength(level);
     
@@ -104,45 +125,26 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
       return { text, fontSize: getTextSize(level) };
     }
     
-    // Use smaller font size for long text (same for all levels)
-    const fontSize = 'text-xs font-medium';
+    // Try with smaller font size first
+    const smallFontSize = 'text-xs font-medium';
     
-    // If still too long, truncate but with more characters
-    const extendedLength = maxLength + 5;
+    // For larger circles, allow more text even with small font
+    const extendedLength = maxLength + 10; // Increased from 5 to 10
+    
+    // If text is still too long even with extended length, truncate
     const finalText = text.length > extendedLength ? `${text.substring(0, extendedLength)}...` : text;
     
-    return { text: finalText, fontSize };
+    return { text: finalText, fontSize: smallFontSize };
   };
 
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) { // Only start dragging on SVG background, not on nodes
-      setIsDragging(true);
-      setDragStart({ x: e.clientX, y: e.clientY });
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging) {
-      const deltaX = e.clientX - dragStart.x;
-      const deltaY = e.clientY - dragStart.y;
-      setPanX(prev => prev - deltaX / zoom);
-      setPanY(prev => prev - deltaY / zoom);
-      setDragStart({ x: e.clientX, y: e.clientY });
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  const handleMouseLeave = () => {
-    setIsDragging(false);
-  };
+  // Removed mouse event handlers - circles will stay fixed
 
   const improveNodeSpacing = (nodes: MindMapNode[]) => {
-    const horizontalSpacing = 80; // Minimum horizontal spacing between circular nodes
-    const verticalSpacing = 100;  // Minimum vertical spacing between levels
+    if (!nodes || !Array.isArray(nodes)) return [];
+    
+    const horizontalSpacing = 100; // Minimum horizontal spacing between circular nodes (increased for larger circles)
+    const verticalSpacing = 180;  // Minimum vertical spacing between levels (further increased for more vertical space)
     const improvedNodes = [...nodes];
     
     // Group nodes by level for better spacing
@@ -211,7 +213,7 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
   };
 
   const centerMindMap = () => {
-    if (!mindMap || !mindMap.nodes.length) return mindMap;
+    if (!mindMap || !mindMap.nodes || !mindMap.nodes.length) return mindMap;
     
     // First improve spacing
     const spacedNodes = improveNodeSpacing(mindMap.nodes);
@@ -236,26 +238,30 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
     const currentWidth = maxX - minX;
     const currentHeight = maxY - minY;
     
-    // SVG viewport dimensions - larger for better visibility
-    const svgWidth = 1400;  // Increased width
-    const svgHeight = 800;  // Increased height
-    
-    // Add padding to ensure nodes aren't cut off
-    const padding = 50;
+        // SVG viewport dimensions - larger for better visibility with bigger circles and more vertical space
+        const svgWidth = 1800;  // Increased width to prevent cropping
+        const svgHeight = 1500;  // Further increased height to prevent bottom cropping
+
+    // Add more padding to ensure nodes aren't cut off
+    const padding = 150;
     const effectiveWidth = svgWidth - (padding * 2);
     const effectiveHeight = svgHeight - (padding * 2);
     
-    // Calculate offset to center the mindmap with padding
-    const offsetX = (effectiveWidth - currentWidth) / 2 - minX + padding;
-    const offsetY = (effectiveHeight - currentHeight) / 2 - minY + padding;
+    // Calculate offset to center the mindmap properly
+    const centerOffsetX = (svgWidth - currentWidth) / 2 - minX;
+    const centerOffsetY = (svgHeight - currentHeight) / 2 - minY;
     
-    // Return centered mindmap with improved spacing
+    // Ensure minimum padding from edges while maintaining center
+    const finalOffsetX = Math.max(centerOffsetX, padding);
+    const finalOffsetY = Math.max(centerOffsetY, padding);
+    
+    // Return centered mindmap with improved spacing and guaranteed padding
     return {
       ...mindMap,
       nodes: spacedNodes.map(node => ({
         ...node,
-        x: node.x + offsetX,
-        y: node.y + offsetY
+        x: node.x + finalOffsetX,
+        y: node.y + finalOffsetY
       }))
     };
   };
@@ -316,7 +322,7 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-3xl font-bold text-gray-800">Mind Map</h1>
             <button
-              onClick={onBack}
+              onClick={onBack || (() => window.history.back())}
               className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2"
             >
               ← Back
@@ -324,7 +330,7 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
           </div>
           
           <div className="text-center">
-            <h2 className="text-xl font-semibold text-gray-700 mb-2">{mindMap.title}</h2>
+            <h2 className="text-xl font-semibold text-gray-700 mb-2">{mindMap.title || 'Mind Map'}</h2>
             <p className="text-gray-600">Interactive mind map generated from your text</p>
           </div>
         </div>
@@ -332,7 +338,7 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
         {/* Mind Map Visualization */}
         <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
           
-          <div className="relative w-full h-[600px] overflow-hidden border-2 border-gray-200 rounded-lg bg-gradient-to-br from-gray-50 to-blue-50">
+          <div className="relative w-full h-[800px] overflow-auto border-2 border-gray-200 rounded-lg bg-gradient-to-br from-gray-50 to-blue-50 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200">
             {(() => {
               const centeredMindMap = centerMindMap();
               
@@ -340,21 +346,19 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
               
               return (
                 <svg
-                  className={`w-full h-full ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} select-none`}
-                  viewBox={`${panX} ${panY} ${1400 / zoom} ${800 / zoom}`}
-                  preserveAspectRatio="xMidYMid meet"
-                  onMouseDown={handleMouseDown}
-                  onMouseMove={handleMouseMove}
-                  onMouseUp={handleMouseUp}
-                  onMouseLeave={handleMouseLeave}
-                  style={{ userSelect: 'none' }}
-                >
-                  {/* Render connections */}
-                  {centeredMindMap.connections.map((connection, index) => {
+                  className="select-none"
+                  width="1800"
+                  height="1500"
+                  viewBox="0 0 1800 1500"
+              preserveAspectRatio="xMidYMid meet"
+                  style={{ userSelect: 'none', minWidth: '1800px', minHeight: '1500px' }}
+            >
+              {/* Render connections */}
+                  {centeredMindMap.connections && centeredMindMap.connections.map((connection, index) => {
                     const fromNode = centeredMindMap.nodes.find(n => n.id === connection.from);
                     const toNode = centeredMindMap.nodes.find(n => n.id === connection.to);
-                    
-                    if (!fromNode || !toNode) return null;
+                
+                if (!fromNode || !toNode) return null;
                     
                     const fromNodeSize = getNodeSize(fromNode.level);
                     const toNodeSize = getNodeSize(toNode.level);
@@ -362,22 +366,22 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
                     const fromCenterY = fromNode.y;
                     const toCenterX = toNode.x;
                     const toCenterY = toNode.y;
-                    
-                    return (
-                      <line
-                        key={index}
+                
+                return (
+                  <line
+                    key={index}
                         x1={fromCenterX}
                         y1={fromCenterY}
                         x2={toCenterX}
                         y2={toCenterY}
                         stroke="#4F46E5"
-                        strokeWidth="2"
+                    strokeWidth="2"
                         strokeOpacity="0.7"
-                        markerEnd="url(#arrowhead)"
+                    markerEnd="url(#arrowhead)"
                         className="drop-shadow-sm"
-                      />
-                    );
-                  })}
+                  />
+                );
+              })}
               
               {/* Arrow marker definition */}
               <defs>
@@ -398,8 +402,8 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
                 </marker>
               </defs>
 
-                  {/* Render nodes */}
-                  {centeredMindMap.nodes.map((node) => {
+              {/* Render nodes */}
+                  {centeredMindMap.nodes && centeredMindMap.nodes.map((node) => {
                     const nodeSize = getNodeSize(node.level);
                     const radius = nodeSize.radius;
                     const centerX = node.x;
@@ -407,24 +411,18 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
                     const { text: displayText, fontSize } = fitTextToNode(node.text, node.level);
                     
                     return (
-                      <g key={node.id}>
+                <g key={node.id}>
                         <circle
                           cx={centerX}
                           cy={centerY}
                           r={radius}
-                          className={`${getNodeColor(node.level)} transition-all duration-200 hover:scale-105 hover:shadow-xl`}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.2))';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))';
-                          }}
+                          className={`${getNodeColor(node.level)}`}
                           filter="drop-shadow(0 4px 8px rgba(0,0,0,0.1))"
-                        />
-                        <text
+                  />
+                  <text
                           x={centerX}
                           y={centerY}
-                          textAnchor="middle"
+                    textAnchor="middle"
                           className={`${fontSize} text-white fill-current`}
                           style={{ 
                             dominantBaseline: 'middle',
@@ -435,11 +433,11 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
                           <tspan x={centerX} dy="0">
                             {displayText}
                           </tspan>
-                        </text>
-                      </g>
+                  </text>
+                </g>
                     );
                   })}
-                </svg>
+            </svg>
               );
             })()}
           </div>
