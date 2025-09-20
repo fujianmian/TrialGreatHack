@@ -167,6 +167,7 @@ async function generateAIQuiz(text: string, questionCount: number, difficulty: s
     function createBedrockClient() {
       console.log("ECS_CONTAINER_METADATA_URI", process.env.ECS_CONTAINER_METADATA_URI);
       console.log("ECS_CONTAINER_METADATA_URI_V4", process.env.ECS_CONTAINER_METADATA_URI_V4);
+      console.log("region", process.env.REGION);
 
       if (process.env.ECS_CONTAINER_METADATA_URI || process.env.ECS_CONTAINER_METADATA_URI_V4) {
         // Running in ECS → rely on Task Role automatically
@@ -198,6 +199,7 @@ Focus on creating questions that test:
 For each question:
 - Create a clear, well-formatted question
 - Provide 4 multiple choice options (A, B, C, D)
+- Place the correct answer at a random position among the 4 options (not always index 0)
 - Mark the correct answer (0-3 index)
 - Provide a detailed explanation of why the answer is correct
 - Assign an appropriate category (e.g., "General", "Technical", "Conceptual")
