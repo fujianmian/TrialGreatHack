@@ -189,30 +189,36 @@ export default function TextToCard({ inputText, onBack }: TextToCardProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      {/* Enhanced Header */}
+      <header className="bg-gradient-to-r from-white/90 to-blue-50/90 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10 shadow-lg">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <button
                 onClick={onBack}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="group p-3 rounded-xl hover:bg-gray-100 transition-all duration-300 hover:-translate-x-1"
               >
-                <i className="fas fa-arrow-left text-xl text-gray-700"></i>
+                <i className="fas fa-arrow-left text-xl text-gray-700 group-hover:text-blue-600 transition-colors"></i>
               </button>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl">
-                  <i className="fas fa-layer-group text-xl text-white"></i>
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-lg">
+                  <i className="fas fa-layer-group text-2xl text-white"></i>
                 </div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                  Flashcard Study
-                </h1>
+                <div>
+                  <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                    Flashcard Study
+                  </h1>
+                  <p className="text-sm text-gray-600">Interactive learning experience</p>
+                </div>
               </div>
             </div>
             
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-600">Study Mode:</span>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <i className="fas fa-cog text-blue-600"></i>
+                  Study Mode:
+                </span>
                 <select
                   value={studyMode}
                   onChange={(e) => {
@@ -220,15 +226,18 @@ export default function TextToCard({ inputText, onBack }: TextToCardProps) {
                     setCurrentCardIndex(0);
                     setIsFlipped(false);
                   }}
-                  className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-600"
+                  className="px-4 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white shadow-sm"
                 >
                   <option value="all">All Cards ({flashcards.length})</option>
                   <option value="incorrect">Incorrect Only ({incorrectCards.size})</option>
                 </select>
               </div>
               
-              <div className="text-sm text-gray-600">
-                {currentCardIndex + 1} of {getFilteredCards().length}
+              <div className="bg-gradient-to-r from-blue-100 to-indigo-100 rounded-xl px-4 py-2 shadow-sm">
+                <div className="text-sm font-semibold text-gray-700 text-center">
+                  <div className="text-lg font-bold text-blue-700">{currentCardIndex + 1}</div>
+                  <div className="text-xs text-gray-600">of {getFilteredCards().length}</div>
+                </div>
               </div>
             </div>
           </div>
@@ -237,24 +246,37 @@ export default function TextToCard({ inputText, onBack }: TextToCardProps) {
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Progress Bar */}
-        <div className="mb-8">
-          <div className="flex justify-between text-sm text-gray-600 mb-2">
-            <span>Progress</span>
-            <span>{Math.round(((currentCardIndex + 1) / getFilteredCards().length) * 100)}%</span>
+        {/* Enhanced Progress Bar */}
+        <div className="mb-8 bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg">
+                <i className="fas fa-chart-line text-white text-sm"></i>
+              </div>
+              <span className="text-lg font-semibold text-gray-800">Study Progress</span>
+            </div>
+            <div className="bg-gradient-to-r from-blue-100 to-indigo-100 rounded-xl px-4 py-2">
+              <span className="text-lg font-bold text-blue-700">
+                {Math.round(((currentCardIndex + 1) / getFilteredCards().length) * 100)}%
+              </span>
+            </div>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-gray-200 rounded-full h-3 shadow-inner">
             <div 
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 h-2 rounded-full transition-all duration-300"
+              className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 h-3 rounded-full transition-all duration-500 ease-out shadow-lg"
               style={{width: `${((currentCardIndex + 1) / getFilteredCards().length) * 100}%`}}
             ></div>
           </div>
+          <div className="flex justify-between text-sm text-gray-600 mt-2">
+            <span>Card {currentCardIndex + 1} of {getFilteredCards().length}</span>
+            <span>{getFilteredCards().length - currentCardIndex - 1} remaining</span>
+          </div>
         </div>
 
-        {/* Flashcard */}
-        <div className="relative mb-8">
+        {/* Enhanced Flashcard */}
+        <div className="relative mb-8 perspective-1000">
           <div 
-            className={`relative w-full h-96 cursor-pointer transform-gpu transition-transform duration-700 ${
+            className={`relative w-full h-96 cursor-pointer transform-gpu transition-transform duration-700 hover:scale-105 ${
               isFlipped ? 'rotate-y-180' : ''
             }`}
             onClick={flipCard}
@@ -262,66 +284,80 @@ export default function TextToCard({ inputText, onBack }: TextToCardProps) {
           >
             {/* Front of card */}
             <div className={`absolute inset-0 w-full h-full backface-hidden ${isFlipped ? 'hidden' : 'block'}`}>
-              <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 p-8 h-full flex flex-col justify-center items-center text-center">
-                <div className="mb-4">
-                  <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
-                    {currentCard?.category}
-                  </span>
-                </div>
-                <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4">
-                  {currentCard?.front}
-                </h2>
-                <div className="text-gray-500 text-sm">
-                  <i className="fas fa-hand-pointer mr-2"></i>
-                  Click to reveal answer
+              <div className="bg-gradient-to-br from-white via-blue-50 to-indigo-50 rounded-3xl shadow-2xl border border-gray-200 p-8 h-full flex flex-col justify-center items-center text-center relative overflow-hidden group">
+                {/* Decorative elements */}
+                <div className="absolute top-4 right-4 w-20 h-20 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full opacity-50 group-hover:opacity-70 transition-opacity duration-300"></div>
+                <div className="absolute bottom-4 left-4 w-16 h-16 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full opacity-40 group-hover:opacity-60 transition-opacity duration-300"></div>
+                
+                <div className="relative z-10">
+                  <div className="mb-6">
+                    <span className="inline-block px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold rounded-full shadow-lg">
+                      <i className="fas fa-tag mr-2"></i>
+                      {currentCard?.category}
+                    </span>
+                  </div>
+                  <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-6 leading-tight">
+                    {currentCard?.front}
+                  </h2>
+                  <div className="flex items-center justify-center text-gray-500 text-sm bg-white/60 backdrop-blur-sm rounded-full px-4 py-2 shadow-sm">
+                    <i className="fas fa-hand-pointer mr-2 animate-bounce"></i>
+                    Click to reveal answer
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Back of card */}
             <div className={`absolute inset-0 w-full h-full backface-hidden ${isFlipped ? 'block' : 'hidden'}`}>
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl shadow-2xl border border-blue-200 p-8 h-full flex flex-col justify-center items-center text-center">
-                <div className="mb-4">
-                  <span className="inline-block px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
-                    Answer
-                  </span>
-                </div>
-                <p className="text-lg md:text-xl text-gray-700 leading-relaxed">
-                  {currentCard?.back}
-                </p>
-                <div className="text-gray-500 text-sm mt-4">
-                  <i className="fas fa-hand-pointer mr-2"></i>
-                  Click to flip back
+              <div className="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 rounded-3xl shadow-2xl border border-green-200 p-8 h-full flex flex-col justify-center items-center text-center relative overflow-hidden group">
+                {/* Decorative elements */}
+                <div className="absolute top-4 right-4 w-20 h-20 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full opacity-50 group-hover:opacity-70 transition-opacity duration-300"></div>
+                <div className="absolute bottom-4 left-4 w-16 h-16 bg-gradient-to-br from-teal-100 to-cyan-100 rounded-full opacity-40 group-hover:opacity-60 transition-opacity duration-300"></div>
+                
+                <div className="relative z-10">
+                  <div className="mb-6">
+                    <span className="inline-block px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-sm font-semibold rounded-full shadow-lg">
+                      <i className="fas fa-check-circle mr-2"></i>
+                      Answer
+                    </span>
+                  </div>
+                  <p className="text-xl md:text-2xl text-gray-700 leading-relaxed mb-6">
+                    {currentCard?.back}
+                  </p>
+                  <div className="flex items-center justify-center text-gray-500 text-sm bg-white/60 backdrop-blur-sm rounded-full px-4 py-2 shadow-sm">
+                    <i className="fas fa-hand-pointer mr-2 animate-bounce"></i>
+                    Click to flip back
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Controls */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+        {/* Enhanced Controls */}
+        <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-8">
           <button
             onClick={prevCard}
             disabled={getFilteredCards().length <= 1}
-            className="px-6 py-3 rounded-full border-2 border-gray-300 text-gray-700 font-semibold hover:border-blue-600 hover:text-blue-600 hover:bg-blue-50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="group px-8 py-4 rounded-2xl border-2 border-gray-300 text-gray-700 font-semibold hover:border-blue-600 hover:text-blue-600 hover:bg-blue-50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-1 hover:shadow-lg"
           >
-            <i className="fas fa-chevron-left mr-2"></i>
+            <i className="fas fa-chevron-left mr-3 group-hover:-translate-x-1 transition-transform duration-300"></i>
             Previous
           </button>
 
-          <div className="flex gap-3">
+          <div className="flex gap-4">
             <button
               onClick={markIncorrect}
-              className="px-6 py-3 rounded-full bg-red-500 text-white font-semibold hover:bg-red-600 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
+              className="group px-8 py-4 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold hover:from-red-600 hover:to-red-700 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-red-500/25"
             >
-              <i className="fas fa-times mr-2"></i>
+              <i className="fas fa-times mr-3 group-hover:rotate-90 transition-transform duration-300"></i>
               Incorrect
             </button>
             <button
               onClick={markCorrect}
-              className="px-6 py-3 rounded-full bg-green-500 text-white font-semibold hover:bg-green-600 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
+              className="group px-8 py-4 rounded-2xl bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold hover:from-green-600 hover:to-green-700 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-green-500/25"
             >
-              <i className="fas fa-check mr-2"></i>
+              <i className="fas fa-check mr-3 group-hover:scale-110 transition-transform duration-300"></i>
               Correct
             </button>
           </div>
@@ -329,10 +365,10 @@ export default function TextToCard({ inputText, onBack }: TextToCardProps) {
           <button
             onClick={nextCard}
             disabled={getFilteredCards().length <= 1}
-            className="px-6 py-3 rounded-full border-2 border-gray-300 text-gray-700 font-semibold hover:border-blue-600 hover:text-blue-600 hover:bg-blue-50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="group px-8 py-4 rounded-2xl border-2 border-gray-300 text-gray-700 font-semibold hover:border-blue-600 hover:text-blue-600 hover:bg-blue-50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-1 hover:shadow-lg"
           >
             Next
-            <i className="fas fa-chevron-right ml-2"></i>
+            <i className="fas fa-chevron-right ml-3 group-hover:translate-x-1 transition-transform duration-300"></i>
           </button>
         </div>
 
