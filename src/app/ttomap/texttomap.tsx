@@ -30,7 +30,11 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
   const [mindMap, setMindMap] = useState<MindMapResponse | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   const generateMindMap = useCallback(async () => {
     setIsGenerating(true);
@@ -60,12 +64,12 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
 
   const getNodeColor = (level: number) => {
     const colors = [
-      'bg-blue-500',      // Level 0 - Main topic
-      'bg-green-500',     // Level 1 - Primary branches
-      'bg-purple-500',    // Level 2 - Secondary branches
-      'bg-orange-500',    // Level 3 - Tertiary branches
-      'bg-pink-500',      // Level 4 - Details
-      'bg-indigo-500',    // Level 5+ - More details
+      'bg-gradient-to-br from-purple-600 to-purple-700 shadow-lg',     // Level 0 - Main topic
+      'bg-gradient-to-br from-blue-500 to-blue-600 shadow-md',         // Level 1 - Primary branches
+      'bg-gradient-to-br from-green-500 to-green-600 shadow-md',       // Level 2 - Secondary branches
+      'bg-gradient-to-br from-yellow-500 to-orange-500 shadow-sm',     // Level 3 - Tertiary branches
+      'bg-gradient-to-br from-red-500 to-red-600 shadow-sm',           // Level 4 - Details
+      'bg-gradient-to-br from-gray-500 to-gray-600 shadow-sm',         // Level 5+ - More details
     ];
     return colors[Math.min(level, colors.length - 1)];
   };
@@ -77,15 +81,183 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
   }, [inputText, generateMindMap]);
 
   const getTextSize = (level: number) => {
-    const sizes = [
-      'text-lg font-bold',    // Level 0 - Main topic
-      'text-base font-semibold', // Level 1 - Primary branches
-      'text-sm font-medium',  // Level 2 - Secondary branches
-      'text-xs font-medium',  // Level 3 - Tertiary branches
-      'text-xs',              // Level 4 - Details
-      'text-xs',              // Level 5+ - More details
-    ];
-    return sizes[Math.min(level, sizes.length - 1)];
+    // All nodes same text size regardless of level
+    return 'text-sm font-medium';
+  };
+
+  const getNodeSize = (level: number) => {
+    // All nodes same circular size regardless of level
+    return { radius: 60 };
+  };
+
+  const getMaxTextLength = (level: number) => {
+    // All nodes same text length limit regardless of level
+    return 25;
+  };
+
+  const fitTextToNode = (text: string, level: number) => {
+    const nodeSize = getNodeSize(level);
+    const maxLength = getMaxTextLength(level);
+    
+    // If text fits within limits, return as is
+    if (text.length <= maxLength) {
+      return { text, fontSize: getTextSize(level) };
+    }
+    
+    // Use smaller font size for long text (same for all levels)
+    const fontSize = 'text-xs font-medium';
+    
+    // If still too long, truncate but with more characters
+    const extendedLength = maxLength + 5;
+    const finalText = text.length > extendedLength ? `${text.substring(0, extendedLength)}...` : text;
+    
+    return { text: finalText, fontSize };
+  };
+
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) { // Only start dragging on SVG background, not on nodes
+      setIsDragging(true);
+      setDragStart({ x: e.clientX, y: e.clientY });
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isDragging) {
+      const deltaX = e.clientX - dragStart.x;
+      const deltaY = e.clientY - dragStart.y;
+      setPanX(prev => prev - deltaX / zoom);
+      setPanY(prev => prev - deltaY / zoom);
+      setDragStart({ x: e.clientX, y: e.clientY });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  const improveNodeSpacing = (nodes: MindMapNode[]) => {
+    const horizontalSpacing = 80; // Minimum horizontal spacing between circular nodes
+    const verticalSpacing = 100;  // Minimum vertical spacing between levels
+    const improvedNodes = [...nodes];
+    
+    // Group nodes by level for better spacing
+    const nodesByLevel = improvedNodes.reduce((acc, node) => {
+      if (!acc[node.level]) acc[node.level] = [];
+      acc[node.level].push(node);
+      return acc;
+    }, {} as Record<number, MindMapNode[]>);
+    
+    // Apply horizontal spacing to each level
+    Object.values(nodesByLevel).forEach(levelNodes => {
+      // Sort nodes by x position
+      levelNodes.sort((a, b) => a.x - b.x);
+      
+      // Apply minimum horizontal spacing for circular nodes
+      for (let i = 1; i < levelNodes.length; i++) {
+        const prevNode = levelNodes[i - 1];
+        const currentNode = levelNodes[i];
+        const nodeRadius = getNodeSize(prevNode.level).radius;
+        
+        const minDistance = (nodeRadius * 2) + horizontalSpacing;
+        const currentDistance = currentNode.x - prevNode.x;
+        
+        if (currentDistance < minDistance) {
+          const adjustment = minDistance - currentDistance;
+          // Move all subsequent nodes
+          for (let j = i; j < levelNodes.length; j++) {
+            const nodeIndex = improvedNodes.findIndex(n => n.id === levelNodes[j].id);
+            if (nodeIndex !== -1) {
+              improvedNodes[nodeIndex].x += adjustment;
+            }
+          }
+        }
+      }
+    });
+    
+    // Apply vertical spacing between levels
+    const levels = Object.keys(nodesByLevel).map(Number).sort((a, b) => a - b);
+    for (let i = 1; i < levels.length; i++) {
+      const prevLevel = levels[i - 1];
+      const currentLevel = levels[i];
+      
+      const prevLevelNodes = nodesByLevel[prevLevel];
+      const currentLevelNodes = nodesByLevel[currentLevel];
+      
+      if (prevLevelNodes && currentLevelNodes) {
+        const nodeRadius = getNodeSize(prevLevelNodes[0].level).radius;
+        const minPrevY = Math.min(...prevLevelNodes.map(n => n.y));
+        const maxPrevY = Math.max(...prevLevelNodes.map(n => n.y + (nodeRadius * 2)));
+        const minCurrentY = Math.min(...currentLevelNodes.map(n => n.y));
+        
+        const currentDistance = minCurrentY - maxPrevY;
+        if (currentDistance < verticalSpacing) {
+          const adjustment = verticalSpacing - currentDistance;
+          currentLevelNodes.forEach(node => {
+            const nodeIndex = improvedNodes.findIndex(n => n.id === node.id);
+            if (nodeIndex !== -1) {
+              improvedNodes[nodeIndex].y += adjustment;
+            }
+          });
+        }
+      }
+    }
+    
+    return improvedNodes;
+  };
+
+  const centerMindMap = () => {
+    if (!mindMap || !mindMap.nodes.length) return mindMap;
+    
+    // First improve spacing
+    const spacedNodes = improveNodeSpacing(mindMap.nodes);
+    
+    // Calculate bounding box of all circular nodes with padding
+    const nodePositions = spacedNodes.map(node => {
+      const nodeSize = getNodeSize(node.level);
+      const radius = nodeSize.radius;
+      return {
+        x: node.x - radius,
+        y: node.y - radius,
+        width: radius * 2,
+        height: radius * 2
+      };
+    });
+    
+    const minX = Math.min(...nodePositions.map(n => n.x));
+    const maxX = Math.max(...nodePositions.map(n => n.x + n.width));
+    const minY = Math.min(...nodePositions.map(n => n.y));
+    const maxY = Math.max(...nodePositions.map(n => n.y + n.height));
+    
+    const currentWidth = maxX - minX;
+    const currentHeight = maxY - minY;
+    
+    // SVG viewport dimensions - larger for better visibility
+    const svgWidth = 1400;  // Increased width
+    const svgHeight = 800;  // Increased height
+    
+    // Add padding to ensure nodes aren't cut off
+    const padding = 50;
+    const effectiveWidth = svgWidth - (padding * 2);
+    const effectiveHeight = svgHeight - (padding * 2);
+    
+    // Calculate offset to center the mindmap with padding
+    const offsetX = (effectiveWidth - currentWidth) / 2 - minX + padding;
+    const offsetY = (effectiveHeight - currentHeight) / 2 - minY + padding;
+    
+    // Return centered mindmap with improved spacing
+    return {
+      ...mindMap,
+      nodes: spacedNodes.map(node => ({
+        ...node,
+        x: node.x + offsetX,
+        y: node.y + offsetY
+      }))
+    };
   };
 
   if (isGenerating) {
@@ -159,133 +331,121 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
 
         {/* Mind Map Visualization */}
         <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
-          <div className="relative w-full h-96 overflow-auto border-2 border-gray-200 rounded-lg bg-gray-50">
-            <svg
-              className="w-full h-full"
-              viewBox="0 0 800 400"
-              preserveAspectRatio="xMidYMid meet"
-            >
-              {/* Render connections */}
-              {mindMap.connections.map((connection, index) => {
-                const fromNode = mindMap.nodes.find(n => n.id === connection.from);
-                const toNode = mindMap.nodes.find(n => n.id === connection.to);
-                
-                if (!fromNode || !toNode) return null;
-                
-                return (
-                  <line
-                    key={index}
-                    x1={fromNode.x + 64} // Center of node
-                    y1={fromNode.y + 32}
-                    x2={toNode.x + 64}
-                    y2={toNode.y + 32}
-                    stroke="#9CA3AF"
-                    strokeWidth="2"
-                    markerEnd="url(#arrowhead)"
-                  />
-                );
-              })}
+          
+          <div className="relative w-full h-[600px] overflow-hidden border-2 border-gray-200 rounded-lg bg-gradient-to-br from-gray-50 to-blue-50">
+            {(() => {
+              const centeredMindMap = centerMindMap();
+              
+              if (!centeredMindMap) return null;
+              
+              return (
+                <svg
+                  className={`w-full h-full ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} select-none`}
+                  viewBox={`${panX} ${panY} ${1400 / zoom} ${800 / zoom}`}
+                  preserveAspectRatio="xMidYMid meet"
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={handleMouseLeave}
+                  style={{ userSelect: 'none' }}
+                >
+                  {/* Render connections */}
+                  {centeredMindMap.connections.map((connection, index) => {
+                    const fromNode = centeredMindMap.nodes.find(n => n.id === connection.from);
+                    const toNode = centeredMindMap.nodes.find(n => n.id === connection.to);
+                    
+                    if (!fromNode || !toNode) return null;
+                    
+                    const fromNodeSize = getNodeSize(fromNode.level);
+                    const toNodeSize = getNodeSize(toNode.level);
+                    const fromCenterX = fromNode.x;
+                    const fromCenterY = fromNode.y;
+                    const toCenterX = toNode.x;
+                    const toCenterY = toNode.y;
+                    
+                    return (
+                      <line
+                        key={index}
+                        x1={fromCenterX}
+                        y1={fromCenterY}
+                        x2={toCenterX}
+                        y2={toCenterY}
+                        stroke="#4F46E5"
+                        strokeWidth="2"
+                        strokeOpacity="0.7"
+                        markerEnd="url(#arrowhead)"
+                        className="drop-shadow-sm"
+                      />
+                    );
+                  })}
               
               {/* Arrow marker definition */}
               <defs>
                 <marker
                   id="arrowhead"
-                  markerWidth="10"
-                  markerHeight="7"
-                  refX="9"
-                  refY="3.5"
+                  markerWidth="6"
+                  markerHeight="4"
+                  refX="5"
+                  refY="2"
                   orient="auto"
+                  markerUnits="strokeWidth"
                 >
                   <polygon
-                    points="0 0, 10 3.5, 0 7"
-                    fill="#9CA3AF"
+                    points="0 0, 6 2, 0 4"
+                    fill="#4F46E5"
+                    fillOpacity="0.6"
                   />
                 </marker>
               </defs>
 
-              {/* Render nodes */}
-              {mindMap.nodes.map((node) => (
-                <g key={node.id}>
-                  <rect
-                    x={node.x}
-                    y={node.y}
-                    width="128"
-                    height="64"
-                    rx="8"
-                    ry="8"
-                    className={`${getNodeColor(node.level)} cursor-pointer transition-all duration-200 hover:scale-105 ${
-                      selectedNode === node.id ? 'ring-4 ring-yellow-400' : ''
-                    }`}
-                    onClick={() => setSelectedNode(selectedNode === node.id ? null : node.id)}
-                  />
-                  <text
-                    x={node.x + 64}
-                    y={node.y + 35}
-                    textAnchor="middle"
-                    className={`${getTextSize(node.level)} text-white fill-current`}
-                    style={{ dominantBaseline: 'middle' }}
-                  >
-                    {node.text.length > 15 ? `${node.text.substring(0, 15)}...` : node.text}
-                  </text>
-                </g>
-              ))}
-            </svg>
-          </div>
-        </div>
-
-        {/* Node Details */}
-        {selectedNode && (
-          <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Node Details</h3>
-            {(() => {
-              const node = mindMap.nodes.find(n => n.id === selectedNode);
-              if (!node) return null;
-              
-              return (
-                <div className="space-y-3">
-                  <div>
-                    <span className="font-semibold text-gray-700">Text: </span>
-                    <span className="text-gray-600">{node.text}</span>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-700">Level: </span>
-                    <span className="text-gray-600">{node.level}</span>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-700">Position: </span>
-                    <span className="text-gray-600">({node.x}, {node.y})</span>
-                  </div>
-                  {node.children && node.children.length > 0 && (
-                    <div>
-                      <span className="font-semibold text-gray-700">Children: </span>
-                      <span className="text-gray-600">{node.children.length}</span>
-                    </div>
-                  )}
-                </div>
+                  {/* Render nodes */}
+                  {centeredMindMap.nodes.map((node) => {
+                    const nodeSize = getNodeSize(node.level);
+                    const radius = nodeSize.radius;
+                    const centerX = node.x;
+                    const centerY = node.y;
+                    const { text: displayText, fontSize } = fitTextToNode(node.text, node.level);
+                    
+                    return (
+                      <g key={node.id}>
+                        <circle
+                          cx={centerX}
+                          cy={centerY}
+                          r={radius}
+                          className={`${getNodeColor(node.level)} transition-all duration-200 hover:scale-105 hover:shadow-xl`}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.2))';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))';
+                          }}
+                          filter="drop-shadow(0 4px 8px rgba(0,0,0,0.1))"
+                        />
+                        <text
+                          x={centerX}
+                          y={centerY}
+                          textAnchor="middle"
+                          className={`${fontSize} text-white fill-current`}
+                          style={{ 
+                            dominantBaseline: 'middle',
+                            textShadow: '1px 1px 2px rgba(0,0,0,0.5)',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          <tspan x={centerX} dy="0">
+                            {displayText}
+                          </tspan>
+                        </text>
+                      </g>
+                    );
+                  })}
+                </svg>
               );
             })()}
           </div>
-        )}
-
-        {/* Legend */}
-        <div className="bg-white rounded-2xl shadow-2xl p-6">
-          <h3 className="text-xl font-bold text-gray-800 mb-4">Legend</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {[0, 1, 2, 3, 4, 5].map((level) => (
-              <div key={level} className="flex items-center gap-2">
-                <div className={`w-4 h-4 rounded ${getNodeColor(level)}`}></div>
-                <span className="text-sm text-gray-600">
-                  Level {level}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 text-sm text-gray-600">
-            <p>• Click on any node to see its details</p>
-            <p>• Nodes are color-coded by hierarchy level</p>
-            <p>• Arrows show relationships between concepts</p>
-          </div>
         </div>
+
+
       </div>
     </div>
   );
