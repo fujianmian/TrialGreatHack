@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock": "^3.893.0",
     "@aws-sdk/client-bedrock-runtime": "^3.893.0",
     "next": "15.5.3",
     "react": "19.1.0",
