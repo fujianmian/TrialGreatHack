@@ -4,6 +4,8 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const text = body.text || "";
+    const questionCount = body.questionCount || 5;
+    const difficulty = body.difficulty || "Beginner";
 
     if (!text.trim()) {
       return NextResponse.json({ error: "Article content cannot be empty" }, { status: 400 });
@@ -16,18 +18,18 @@ export async function POST(req: Request) {
     if (hasAWSCredentials) {
       try {
         console.log("🤖 Attempting AWS Bedrock AI generation...");
-        flashcards = await generateAIFlashcards(text);
+        flashcards = await generateAIFlashcards(text, questionCount, difficulty);
         console.log("✅ AI generation successful, generated", flashcards.length, "flashcards");
       } catch (aiError) {
         console.warn("⚠️ AI generation failed, using fallback:", aiError instanceof Error ? aiError.message : String(aiError));
         console.log("🔄 Switching to algorithm-based generation...");
-        flashcards = generateFlashcards(text);
+        flashcards = generateFlashcards(text, questionCount, difficulty);
         console.log("✅ Fallback generation complete, generated", flashcards.length, "flashcards");
       }
     } else {
       console.log("⚠️ AWS credentials not found, using algorithm-based generation...");
       console.log("💡 To use AI generation, add AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY to .env.local");
-      flashcards = generateFlashcards(text);
+      flashcards = generateFlashcards(text, questionCount, difficulty);
       console.log("✅ Algorithm generation complete, generated", flashcards.length, "flashcards");
     }
 
@@ -43,7 +45,7 @@ export async function POST(req: Request) {
 }
 
 // Generate flashcards from text content - concept-based approach
-function generateFlashcards(text: string) {
+function generateFlashcards(text: string, questionCount: number, difficulty: string) {
   const flashcards: Array<{id: number, front: string, back: string, category: string}> = [];
   
   // Extract key concepts and terms from the text
@@ -65,7 +67,7 @@ function generateFlashcards(text: string) {
     });
   });
   
-  return flashcards.slice(0, 10); // Return up to 10 flashcards
+  return flashcards.slice(0, questionCount); // Return the requested number of flashcards
 }
 
 // Extract key concepts from text - focus on meaningful terms and phrases
@@ -98,7 +100,7 @@ function extractKeyConcepts(text: string): Array<{term: string, category: string
   // Sort by importance and return top concepts
   return concepts
     .sort((a, b) => b.context.length - a.context.length)
-    .slice(0, 10);
+    .slice(0, Math.max(15, questionCount)); // Extract enough concepts for the requested count
 }
 
 // Extract technical terms (compound words, hyphenated terms, etc.)
@@ -365,7 +367,7 @@ function isUnimportantWord(word: string): boolean {
 
 
 // AI-powered flashcard generation using AWS Bedrock
-async function generateAIFlashcards(text: string) {
+async function generateAIFlashcards(text: string, questionCount: number, difficulty: string) {
   console.log("🤖 Attempting AWS Bedrock AI generation...");
   console.log("🔍 Environment check:");
   console.log("AWS_REGION:", process.env.AWS_REGION);
@@ -395,7 +397,7 @@ async function generateAIFlashcards(text: string) {
       },
     });
 
-    const prompt = `Please analyze the following text and create 8-10 flashcards for effective learning.
+    const prompt = `Please analyze the following text and create exactly ${questionCount} flashcards for effective learning at ${difficulty} level.
 
 Focus on IMPORTANT CONCEPTS with MAXIMUM 2 WORDS on the front. Include:
 - Key terms and concepts (1-2 words maximum)
@@ -517,8 +519,8 @@ ${text}`;
           if (jsonMatch) {
             const flashcards = JSON.parse(jsonMatch[0]);
             
-            // Validate and clean the response
-            return flashcards.map((card: {front?: string, back?: string, category?: string}, index: number) => {
+            // Validate and clean the response, limit to requested count
+            return flashcards.slice(0, questionCount).map((card: {front?: string, back?: string, category?: string}, index: number) => {
               // Ensure front is maximum 2 words
               const frontWords = (card.front || `Question ${index + 1}`).split(' ');
               const front = frontWords.length > 2 ? frontWords.slice(0, 2).join(' ') : card.front || `Question ${index + 1}`;

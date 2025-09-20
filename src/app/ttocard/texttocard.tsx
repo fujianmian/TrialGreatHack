@@ -20,9 +20,11 @@ interface AIResponse {
 interface TextToCardProps {
   inputText: string;
   onBack: () => void;
+  questionCount: number;
+  difficulty: string;
 }
 
-export default function TextToCard({ inputText, onBack }: TextToCardProps) {
+export default function TextToCard({ inputText, onBack, questionCount, difficulty }: TextToCardProps) {
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -54,7 +56,9 @@ export default function TextToCard({ inputText, onBack }: TextToCardProps) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          text: inputText
+          text: inputText,
+          questionCount: questionCount,
+          difficulty: difficulty
         }),
       });
 
@@ -81,23 +85,78 @@ export default function TextToCard({ inputText, onBack }: TextToCardProps) {
       setIsGenerating(false);
       
       // Fallback to mock data if AI fails
-      const fallbackFlashcards: Flashcard[] = [
-        {
-          id: 1,
-          front: "What is the main topic?",
-          back: "This content discusses various concepts and terminology.",
-          category: "General"
-        },
-        {
-          id: 2,
-          front: "What are the key concepts?",
-          back: "The key concepts include important terms and definitions from the content.",
-          category: "General"
+      const generateFallbackFlashcards = (count: number, difficulty: string): Flashcard[] => {
+        const baseFlashcards = [
+          {
+            front: "What is the main topic?",
+            back: "This content discusses various concepts and terminology.",
+            category: "General"
+          },
+          {
+            front: "What are the key concepts?",
+            back: "The key concepts include important terms and definitions from the content.",
+            category: "General"
+          },
+          {
+            front: "What is quantum computing?",
+            back: "Quantum computing is a type of computation that uses quantum mechanical phenomena.",
+            category: "Technical"
+          },
+          {
+            front: "What are qubits?",
+            back: "Qubits are the basic units of quantum information, similar to bits in classical computing.",
+            category: "Technical"
+          },
+          {
+            front: "What is quantum superposition?",
+            back: "Quantum superposition is the ability of quantum particles to exist in multiple states simultaneously.",
+            category: "Advanced"
+          },
+          {
+            front: "What is quantum entanglement?",
+            back: "Quantum entanglement is a phenomenon where particles become interconnected and share properties.",
+            category: "Advanced"
+          },
+          {
+            front: "How do quantum computers work?",
+            back: "Quantum computers use quantum mechanical phenomena like superposition and entanglement to process information.",
+            category: "Advanced"
+          },
+          {
+            front: "What are quantum algorithms?",
+            back: "Quantum algorithms are algorithms designed to run on quantum computers, taking advantage of quantum properties.",
+            category: "Advanced"
+          },
+          {
+            front: "What is quantum decoherence?",
+            back: "Quantum decoherence is the loss of quantum coherence due to interaction with the environment.",
+            category: "Advanced"
+          },
+          {
+            front: "What are quantum gates?",
+            back: "Quantum gates are the basic building blocks of quantum circuits, similar to logic gates in classical computing.",
+            category: "Advanced"
+          }
+        ];
+
+        // Generate flashcards based on difficulty and count
+        const flashcards: Flashcard[] = [];
+        for (let i = 0; i < count; i++) {
+          const baseCard = baseFlashcards[i % baseFlashcards.length];
+          flashcards.push({
+            id: i + 1,
+            front: `${baseCard.front} (${difficulty} Level)`,
+            back: `${baseCard.back} This is a ${difficulty.toLowerCase()} level concept.`,
+            category: baseCard.category
+          });
         }
-      ];
+        return flashcards;
+      };
+
+      const fallbackFlashcards = generateFallbackFlashcards(questionCount, difficulty);
       setFlashcards(fallbackFlashcards);
     }
-  }, [inputText]);
+  }, [inputText, questionCount, difficulty]);
 
   // Generate flashcards from input text
   useEffect(() => {

@@ -14,13 +14,15 @@ interface QuizQuestion {
 interface TextToQuizProps {
   inputText: string;
   onBack: () => void;
+  questionCount: number;
+  difficulty: string;
 }
 
 interface AIResponse {
   result: QuizQuestion[];
 }
 
-export default function TextToQuiz({ inputText, onBack }: TextToQuizProps) {
+export default function TextToQuiz({ inputText, onBack, questionCount, difficulty }: TextToQuizProps) {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
@@ -43,7 +45,9 @@ export default function TextToQuiz({ inputText, onBack }: TextToQuizProps) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          text: inputText
+          text: inputText,
+          questionCount: questionCount,
+          difficulty: difficulty
         }),
       });
 
@@ -61,37 +65,63 @@ export default function TextToQuiz({ inputText, onBack }: TextToQuizProps) {
       setIsGenerating(false);
       
       // Fallback to mock data if API fails
-      const fallbackQuestions: QuizQuestion[] = [
-        {
-          id: 1,
-          question: "What is the main topic discussed in the text?",
-          options: [
-            "Quantum computing basics",
-            "Classical computing principles", 
-            "Data storage methods",
-            "Network protocols"
-          ],
-          correctAnswer: 0,
-          explanation: "The text primarily discusses quantum computing and its fundamental principles.",
-          category: "General"
-        },
-        {
-          id: 2,
-          question: "What are quantum bits called?",
-          options: [
-            "Qubits",
-            "Quantum bytes",
-            "Quantum units",
-            "Quantum particles"
-          ],
-          correctAnswer: 0,
-          explanation: "Quantum bits are called qubits, which can exist in superposition states.",
-          category: "Technical"
+      const generateFallbackQuestions = (count: number, difficulty: string): QuizQuestion[] => {
+        const baseQuestions = [
+          {
+            question: "What is the main topic discussed in the text?",
+            options: ["Quantum computing basics", "Classical computing principles", "Data storage methods", "Network protocols"],
+            correctAnswer: 0,
+            explanation: "The text primarily discusses quantum computing and its fundamental principles.",
+            category: "General"
+          },
+          {
+            question: "What are quantum bits called?",
+            options: ["Qubits", "Quantum bytes", "Quantum units", "Quantum particles"],
+            correctAnswer: 0,
+            explanation: "Quantum bits are called qubits, which can exist in superposition states.",
+            category: "Technical"
+          },
+          {
+            question: "How do quantum computers differ from classical computers?",
+            options: ["They use different programming languages", "They can process multiple states simultaneously", "They are physically larger", "They use different operating systems"],
+            correctAnswer: 1,
+            explanation: "Quantum computers can process multiple states simultaneously due to quantum superposition.",
+            category: "Technical"
+          },
+          {
+            question: "What is quantum superposition?",
+            options: ["A type of quantum error", "The ability to exist in multiple states", "A quantum algorithm", "A quantum measurement technique"],
+            correctAnswer: 1,
+            explanation: "Quantum superposition allows quantum particles to exist in multiple states simultaneously.",
+            category: "Advanced"
+          },
+          {
+            question: "Which principle allows quantum computers to be faster?",
+            options: ["Quantum entanglement", "Quantum tunneling", "Quantum interference", "All of the above"],
+            correctAnswer: 3,
+            explanation: "All quantum principles (entanglement, tunneling, interference) contribute to quantum computing speed.",
+            category: "Advanced"
+          }
+        ];
+
+        // Generate questions based on difficulty and count
+        const questions: QuizQuestion[] = [];
+        for (let i = 0; i < count; i++) {
+          const baseQuestion = baseQuestions[i % baseQuestions.length];
+          questions.push({
+            id: i + 1,
+            ...baseQuestion,
+            question: `${baseQuestion.question} (${difficulty} Level)`,
+            explanation: `${baseQuestion.explanation} This is a ${difficulty.toLowerCase()} level question.`
+          });
         }
-      ];
+        return questions;
+      };
+
+      const fallbackQuestions = generateFallbackQuestions(questionCount, difficulty);
       setQuestions(fallbackQuestions);
     }
-  }, [inputText]);
+  }, [inputText, questionCount, difficulty]);
 
   useEffect(() => {
     if (inputText) {

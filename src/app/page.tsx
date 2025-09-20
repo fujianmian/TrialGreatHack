@@ -72,6 +72,7 @@ export default function Home() {
   const [showQuiz, setShowQuiz] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
+  const [difficultyLevel, setDifficultyLevel] = useState<string>('Beginner');
   
   // Ref for the main content section to scroll to
   const mainContentRef = useRef<HTMLDivElement>(null);
@@ -214,9 +215,22 @@ export default function Home() {
     }
   };
 
+  const getQuestionCount = (difficulty: string): number => {
+    switch (difficulty) {
+      case 'Beginner':
+        return 5;
+      case 'Intermediate':
+        return 10;
+      case 'Advanced':
+        return 15;
+      default:
+        return 5;
+    }
+  };
+
   // Show flashcard component if flashcards are selected
   if (showFlashcards) {
-    return <TextToCard inputText={inputText} onBack={handleBackFromFlashcards} />;
+    return <TextToCard inputText={inputText} onBack={handleBackFromFlashcards} questionCount={getQuestionCount(difficultyLevel)} difficulty={difficultyLevel} />;
   }
 
   // Show summary component if summary is selected
@@ -236,7 +250,7 @@ export default function Home() {
 
   // Show quiz component if quiz is selected
   if (showQuiz) {
-    return <TextToQuiz inputText={inputText} onBack={handleBackFromQuiz} />;
+    return <TextToQuiz inputText={inputText} onBack={handleBackFromQuiz} questionCount={getQuestionCount(difficultyLevel)} difficulty={difficultyLevel} />;
   }
 
   return (
@@ -449,10 +463,14 @@ export default function Home() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2">Difficulty Level</label>
-                  <select className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600">
-                    <option>Beginner</option>
-                    <option>Intermediate</option>
-                    <option>Advanced</option>
+                  <select 
+                    value={difficultyLevel}
+                    onChange={(e) => setDifficultyLevel(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
+                  >
+                    <option value="Beginner">Beginner (5 questions)</option>
+                    <option value="Intermediate">Intermediate (10 questions)</option>
+                    <option value="Advanced">Advanced (15 questions)</option>
                   </select>
                 </div>
                 <div>

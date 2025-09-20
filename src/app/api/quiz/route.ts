@@ -4,6 +4,8 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const text = body.text || "";
+    const questionCount = body.questionCount || 5;
+    const difficulty = body.difficulty || "Beginner";
 
     if (!text.trim()) {
       return NextResponse.json({ error: "Article content cannot be empty" }, { status: 400 });
@@ -13,12 +15,12 @@ export async function POST(req: Request) {
     let questions;
     try {
       console.log("🤖 Attempting AWS Bedrock AI generation for quiz...");
-      questions = await generateAIQuiz(text);
+      questions = await generateAIQuiz(text, questionCount, difficulty);
       console.log("✅ AI generation successful, generated", questions.length, "quiz questions");
     } catch (aiError) {
       console.warn("⚠️ AI generation failed, using fallback:", aiError instanceof Error ? aiError.message : String(aiError));
       console.log("🔄 Switching to algorithm-based generation...");
-      questions = generateQuiz(text);
+      questions = generateQuiz(text, questionCount, difficulty);
       console.log("✅ Fallback generation complete, generated", questions.length, "quiz questions");
     }
 
@@ -34,7 +36,7 @@ export async function POST(req: Request) {
 }
 
 // Generate quiz questions from text content - simple algorithm
-function generateQuiz(text: string) {
+function generateQuiz(text: string, questionCount: number, difficulty: string) {
   const questions: Array<{id: number, question: string, options: string[], correctAnswer: number, explanation: string, category: string}> = [];
   
   // Extract sentences for question generation
@@ -44,11 +46,10 @@ function generateQuiz(text: string) {
     return questions;
   }
 
-  // Generate 5-8 questions based on content
-  const numQuestions = Math.min(8, Math.max(5, Math.floor(sentences.length / 2)));
-  
-  for (let i = 0; i < numQuestions; i++) {
-    const sentenceIndex = Math.floor((i / numQuestions) * sentences.length);
+  // Generate the exact requested number of questions
+  for (let i = 0; i < questionCount; i++) {
+    // Cycle through sentences if we need more questions than sentences
+    const sentenceIndex = i % sentences.length;
     const sentence = sentences[sentenceIndex].trim();
     
     if (sentence.length < 10) continue;
@@ -62,23 +63,49 @@ function generateQuiz(text: string) {
     if (words.length === 0) continue;
     
     const keyWord = words[Math.floor(Math.random() * words.length)];
-    const question = `What is the main concept related to "${keyWord}" in the text?`;
     
-    // Generate options
-    const options = [
-      `The concept involves ${keyWord} and its applications`,
-      `It's a technical term related to ${keyWord}`,
-      `The text discusses ${keyWord} in detail`,
-      `It refers to the importance of ${keyWord}`
-    ];
+    // Create different question types based on difficulty
+    let question, options, explanation, category;
+    
+    if (difficulty === 'Beginner') {
+      question = `What is the main concept related to "${keyWord}" in the text?`;
+      options = [
+        `The concept involves ${keyWord} and its applications`,
+        `It's a technical term related to ${keyWord}`,
+        `The text discusses ${keyWord} in detail`,
+        `It refers to the importance of ${keyWord}`
+      ];
+      explanation = `The text discusses ${keyWord} and its relevance to the main topic.`;
+      category = "General";
+    } else if (difficulty === 'Intermediate') {
+      question = `How does "${keyWord}" relate to the overall topic discussed?`;
+      options = [
+        `${keyWord} is a fundamental concept that supports the main ideas`,
+        `${keyWord} provides context for understanding the broader subject`,
+        `${keyWord} is mentioned as an example of the main concepts`,
+        `${keyWord} helps explain the key principles in the text`
+      ];
+      explanation = `The text uses ${keyWord} to illustrate and support the main concepts being discussed.`;
+      category = "Conceptual";
+    } else { // Advanced
+      question = `What is the significance of "${keyWord}" in the context of this content?`;
+      options = [
+        `${keyWord} represents a critical component that enables the main functionality`,
+        `${keyWord} serves as a foundational element for the advanced concepts`,
+        `${keyWord} demonstrates the complexity of the subject matter`,
+        `${keyWord} illustrates the practical application of theoretical principles`
+      ];
+      explanation = `The text positions ${keyWord} as a key element that demonstrates the depth and complexity of the subject matter.`;
+      category = "Advanced";
+    }
     
     questions.push({
       id: i + 1,
       question: question,
       options: options,
       correctAnswer: 0,
-      explanation: `The text discusses ${keyWord} and its relevance to the main topic.`,
-      category: "General"
+      explanation: explanation,
+      category: category
     });
   }
   
@@ -102,7 +129,7 @@ function isUnimportantWord(word: string): boolean {
 }
 
 // AI-powered quiz generation using AWS Bedrock
-async function generateAIQuiz(text: string) {
+async function generateAIQuiz(text: string, questionCount: number, difficulty: string) {
   console.log("🤖 Attempting AWS Bedrock AI generation for quiz...");
   console.log("🔍 Environment check:");
   console.log("AWS_REGION:", process.env.AWS_REGION);
@@ -132,7 +159,7 @@ async function generateAIQuiz(text: string) {
       },
     });
 
-    const prompt = `Please analyze the following text and create 6-8 quiz questions for testing understanding.
+    const prompt = `Please analyze the following text and create exactly ${questionCount} quiz questions for testing understanding at ${difficulty} level.
 
 Focus on creating questions that test:
 - Key concepts and main ideas
@@ -237,8 +264,8 @@ ${text}`;
           if (jsonMatch) {
             const questions = JSON.parse(jsonMatch[0]);
             
-            // Validate and clean the response
-            return questions.map((question: {question?: string, options?: string[], correctAnswer?: number, explanation?: string, category?: string}, index: number) => ({
+            // Validate and clean the response, limit to requested count
+            return questions.slice(0, questionCount).map((question: {question?: string, options?: string[], correctAnswer?: number, explanation?: string, category?: string}, index: number) => ({
               id: index + 1,
               question: question.question || `Question ${index + 1}`,
               options: question.options || ["Option A", "Option B", "Option C", "Option D"],
