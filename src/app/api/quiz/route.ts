@@ -287,7 +287,7 @@ ${text}`;
           if (jsonMatch) {
             const questions = JSON.parse(jsonMatch[0]);
             
-            // Validate and clean the response, limit to requested count
+            // Validate and clean the response, limit to requested count tigger build
             return questions.slice(0, questionCount).map((question: {question?: string, options?: string[], correctAnswer?: number, explanation?: string, category?: string}, index: number) => ({
               id: index + 1,
               question: question.question || `Question ${index + 1}`,
