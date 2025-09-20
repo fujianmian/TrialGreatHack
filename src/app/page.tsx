@@ -5,6 +5,7 @@ import TextToCard from './ttocard/texttocard';
 import TextToSummary from './ttosummary/texttosummary';
 import TextToMap from './ttomap/texttomap';
 import TextToVideo from './ttovideo/texttovideo';
+import TextToQuiz from './texttoquiz/texttoquiz';
 
 interface InputMethod {
   id: string;
@@ -76,6 +77,7 @@ export default function Home() {
   const [showSummary, setShowSummary] = useState(false);
   const [showMindMap, setShowMindMap] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
+  const [showQuiz, setShowQuiz] = useState(false);
 
   // Add Font Awesome to head
   useEffect(() => {
@@ -95,6 +97,7 @@ export default function Home() {
     setShowSummary(false);
     setShowMindMap(false);
     setShowVideo(false);
+    setShowQuiz(false);
     
     // Check if flashcards are selected
     if (selectedOutputOption === 'flashcards') {
@@ -117,6 +120,12 @@ export default function Home() {
     // Check if video is selected
     if (selectedOutputOption === 'video') {
       setShowVideo(true);
+      return;
+    }
+
+    // Check if quiz is selected
+    if (selectedOutputOption === 'quiz') {
+      setShowQuiz(true);
       return;
     }
 
@@ -163,6 +172,10 @@ export default function Home() {
     setShowVideo(false);
   };
 
+  const handleBackFromQuiz = () => {
+    setShowQuiz(false);
+  };
+
   // Show flashcard component if flashcards are selected
   if (showFlashcards) {
     return <TextToCard inputText={inputText} onBack={handleBackFromFlashcards} />;
@@ -181,6 +194,11 @@ export default function Home() {
   // Show video component if video is selected
   if (showVideo) {
     return <TextToVideo inputText={inputText} onBack={handleBackFromVideo} />;
+  }
+
+  // Show quiz component if quiz is selected
+  if (showQuiz) {
+    return <TextToQuiz inputText={inputText} onBack={handleBackFromQuiz} />;
   }
 
   return (
