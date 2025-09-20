@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import TextToCard from './texttocard/texttocard';
-import TextToSummary from './texttosummary/texttosummary';
+import TextToCard from './ttocard/texttocard';
+import TextToSummary from './ttosummary/texttosummary';
+import TextToMap from './ttomap/texttomap';
+import TextToVideo from './ttovideo/texttovideo';
 
 interface InputMethod {
   id: string;
@@ -38,7 +40,6 @@ const inputMethods: InputMethod[] = [
 ];
 
 const outputOptions: OutputOption[] = [
-  { id: 'notes', name: 'Smart Notes', icon: 'fas fa-sticky-note' },
   { id: 'video', name: 'Video', icon: 'fas fa-video' },
   { id: 'flashcards', name: 'Flashcards', icon: 'fas fa-layer-group' },
   { id: 'mindmap', name: 'Mind Map', icon: 'fas fa-brain' },
@@ -66,13 +67,15 @@ const features: Feature[] = [
 
 export default function Home() {
   const [selectedInputMethod, setSelectedInputMethod] = useState('text');
-  const [selectedOutputOption, setSelectedOutputOption] = useState('notes');
+  const [selectedOutputOption, setSelectedOutputOption] = useState('summary');
   const [inputText, setInputText] = useState('Quantum computing is an area of computing focused on developing computer technology based on the principles of quantum theory. Quantum computers use quantum bits or qubits, which can represent both 0 and 1 simultaneously, unlike classical bits. This allows quantum computers to perform certain calculations much faster than traditional computers.');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showFlashcards, setShowFlashcards] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+  const [showMindMap, setShowMindMap] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
 
   // Add Font Awesome to head
   useEffect(() => {
@@ -87,6 +90,12 @@ export default function Home() {
   }, []);
 
   const handleGenerate = () => {
+    // Reset all show states first
+    setShowFlashcards(false);
+    setShowSummary(false);
+    setShowMindMap(false);
+    setShowVideo(false);
+    
     // Check if flashcards are selected
     if (selectedOutputOption === 'flashcards') {
       setShowFlashcards(true);
@@ -96,6 +105,18 @@ export default function Home() {
     // Check if summary is selected
     if (selectedOutputOption === 'summary') {
       setShowSummary(true);
+      return;
+    }
+
+    // Check if mind map is selected
+    if (selectedOutputOption === 'mindmap') {
+      setShowMindMap(true);
+      return;
+    }
+
+    // Check if video is selected
+    if (selectedOutputOption === 'video') {
+      setShowVideo(true);
       return;
     }
 
@@ -134,6 +155,14 @@ export default function Home() {
     setShowSummary(false);
   };
 
+  const handleBackFromMindMap = () => {
+    setShowMindMap(false);
+  };
+
+  const handleBackFromVideo = () => {
+    setShowVideo(false);
+  };
+
   // Show flashcard component if flashcards are selected
   if (showFlashcards) {
     return <TextToCard inputText={inputText} onBack={handleBackFromFlashcards} />;
@@ -142,6 +171,16 @@ export default function Home() {
   // Show summary component if summary is selected
   if (showSummary) {
     return <TextToSummary inputText={inputText} onBack={handleBackFromSummary} />;
+  }
+
+  // Show mind map component if mind map is selected
+  if (showMindMap) {
+    return <TextToMap inputText={inputText} onBack={handleBackFromMindMap} />;
+  }
+
+  // Show video component if video is selected
+  if (showVideo) {
+    return <TextToVideo inputText={inputText} onBack={handleBackFromVideo} />;
   }
 
   return (
