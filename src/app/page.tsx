@@ -71,7 +71,6 @@ export default function Home() {
   const [selectedOutputOption, setSelectedOutputOption] = useState('summary');
   const [inputText, setInputText] = useState('Quantum computing is an area of computing focused on developing computer technology based on the principles of quantum theory. Quantum computers use quantum bits or qubits, which can represent both 0 and 1 simultaneously, unlike classical bits. This allows quantum computers to perform certain calculations much faster than traditional computers.');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showFlashcards, setShowFlashcards] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
@@ -132,29 +131,10 @@ export default function Home() {
     }
 
     setIsGenerating(true);
-    setGeneratedContent(null);
     
     // Simulate loading delay with more realistic content
     setTimeout(() => {
       setIsGenerating(false);
-      const mockContent: GeneratedContent = {
-        type: selectedOutputOption,
-        title: 'Quantum Computing',
-        content: 'Quantum computing represents a revolutionary approach to computation that leverages the principles of quantum mechanics to process information in ways that classical computers cannot.',
-        keyPoints: [
-          'Uses quantum bits (qubits) that can exist in superposition',
-          'Enables parallel processing of multiple states simultaneously',
-          'Offers exponential speedup for specific algorithms',
-          'Requires extremely low temperatures to maintain quantum states'
-        ],
-        applications: [
-          'Cryptography and cybersecurity',
-          'Drug discovery and molecular simulation',
-          'Financial modeling and optimization',
-          'Artificial intelligence and machine learning'
-        ]
-      };
-      setGeneratedContent(mockContent);
     }, 2000);
   };
 

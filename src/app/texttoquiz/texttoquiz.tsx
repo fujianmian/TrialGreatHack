@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface QuizQuestion {
   id: number;
@@ -32,13 +32,7 @@ export default function TextToQuiz({ inputText, onBack }: TextToQuizProps) {
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<number>>(new Set());
   const [userAnswers, setUserAnswers] = useState<Map<number, number>>(new Map());
 
-  useEffect(() => {
-    if (inputText) {
-      generateQuiz();
-    }
-  }, [inputText]);
-
-  const generateQuiz = async () => {
+  const generateQuiz = useCallback(async () => {
     setIsGenerating(true);
     setError(null);
     
@@ -97,7 +91,13 @@ export default function TextToQuiz({ inputText, onBack }: TextToQuizProps) {
       ];
       setQuestions(fallbackQuestions);
     }
-  };
+  }, [inputText]);
+
+  useEffect(() => {
+    if (inputText) {
+      generateQuiz();
+    }
+  }, [inputText, generateQuiz]);
 
   const handleAnswerSelect = (answerIndex: number) => {
     if (showResult || quizCompleted) return;

@@ -35,7 +35,7 @@ export async function POST(req: Request) {
 
 // Generate flashcards from text content - simple word extraction
 function generateFlashcards(text: string) {
-  const flashcards: any[] = [];
+  const flashcards: Array<{id: number, front: string, back: string, category: string}> = [];
   
   // Extract meaningful words from the text
   const words = extractMeaningfulWords(text);
@@ -44,6 +44,7 @@ function generateFlashcards(text: string) {
   words.forEach((word, index) => {
     const context = findWordContext(word, text);
     flashcards.push({
+      id: index + 1,
       front: word, // Just the word for quick memorization
       back: context || `"${word}" is mentioned in the text as an important term.`,
       category: "Definition"
@@ -67,7 +68,7 @@ function extractMeaningfulWords(text: string): string[] {
     );
   
   const wordCount = new Map();
-  words.forEach(word => {
+  words.forEach((word) => {
     wordCount.set(word, (wordCount.get(word) || 0) + 1);
   });
   
@@ -244,7 +245,7 @@ ${text}`;
         const flashcards = JSON.parse(jsonMatch[0]);
         
         // Validate and clean the response
-        return flashcards.map((card: any, index: number) => ({
+        return flashcards.map((card: {front?: string, back?: string, category?: string}, index: number) => ({
           id: index + 1,
           front: card.front || `Question ${index + 1}`,
           back: card.back || "Answer not available",

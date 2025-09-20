@@ -52,7 +52,7 @@ function generateVideo(text: string) {
   const title = extractMainTopic(text);
   
   // Create slides from sentences
-  const slides: any[] = [];
+  const slides: Array<{id: number, title: string, content: string, duration: number, type: string}> = [];
   let totalDuration = 0;
 
   // Title slide

@@ -35,7 +35,7 @@ export async function POST(req: Request) {
 
 // Generate quiz questions from text content - simple algorithm
 function generateQuiz(text: string) {
-  const questions: any[] = [];
+  const questions: Array<{id: number, question: string, options: string[], correctAnswer: number, explanation: string, category: string}> = [];
   
   // Extract sentences for question generation
   const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 20);
@@ -184,7 +184,7 @@ ${text}`;
         const questions = JSON.parse(jsonMatch[0]);
         
         // Validate and clean the response
-        return questions.map((question: any, index: number) => ({
+        return questions.map((question: {question?: string, options?: string[], correctAnswer?: number, explanation?: string, category?: string}, index: number) => ({
           id: index + 1,
           question: question.question || `Question ${index + 1}`,
           options: question.options || ["Option A", "Option B", "Option C", "Option D"],

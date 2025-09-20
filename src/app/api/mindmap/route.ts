@@ -48,18 +48,17 @@ function generateMindMap(text: string) {
   }
 
   // Extract key concepts and create nodes
-  const nodes: any[] = [];
-  const connections: any[] = [];
+  const nodes: Array<{id: string, label: string, level: number, x?: number, y?: number}> = [];
+  const connections: Array<{from: string, to: string, strength: number}> = [];
   
   // Main topic (first sentence or extracted from text)
   const mainTopic = extractMainTopic(text);
   const mainNode = {
     id: 'main',
-    text: mainTopic,
+    label: mainTopic,
     x: 300,
     y: 150,
-    level: 0,
-    children: []
+    level: 0
   };
   nodes.push(mainNode);
 
@@ -75,16 +74,13 @@ function generateMindMap(text: string) {
     
     const node = {
       id: `level1_${index}`,
-      text: concept,
+      label: concept,
       x: Math.max(50, Math.min(650, x - 64)), // Keep within bounds
       y: Math.max(50, Math.min(300, y - 32)),
-      level: 1,
-      parent: 'main',
-      children: []
+      level: 1
     };
     
-    connections.push({ from: 'main', to: node.id });
-    mainNode.children?.push(node.id);
+    connections.push({ from: 'main', to: node.id, strength: 1 });
     
     return node;
   });
@@ -93,7 +89,7 @@ function generateMindMap(text: string) {
 
   // Create level 2 nodes (secondary branches) for some level 1 nodes
   level1Nodes.slice(0, 2).forEach((parentNode, parentIndex) => {
-    const subConcepts = extractSubConcepts(sentences, parentNode.text);
+    const subConcepts = extractSubConcepts(sentences, parentNode.label);
     subConcepts.slice(0, 2).forEach((concept, index) => {
       const angle = (index * 60) - 30; // Spread around the parent node
       const radius = 80;
@@ -102,16 +98,13 @@ function generateMindMap(text: string) {
       
       const node = {
         id: `level2_${parentIndex}_${index}`,
-        text: concept,
+        label: concept,
         x: Math.max(50, Math.min(650, x - 64)),
         y: Math.max(50, Math.min(300, y - 32)),
-        level: 2,
-        parent: parentNode.id,
-        children: []
+        level: 2
       };
       
-      connections.push({ from: parentNode.id, to: node.id });
-      parentNode.children?.push(node.id);
+      connections.push({ from: parentNode.id, to: node.id, strength: 1 });
       
       nodes.push(node);
     });
