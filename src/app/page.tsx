@@ -376,7 +376,7 @@ export default function Home() {
             
             <div className="mb-6">
               {selectedInputMethod === 'upload' ? (
-                <div className="w-full h-40 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center hover:border-blue-400 hover:bg-blue-50 transition-all duration-300">
+                <div className="w-full min-h-48 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center hover:border-blue-400 hover:bg-blue-50 transition-all duration-300 p-4">
                   {uploadedFile ? (
                     <div className="text-center p-4">
                       <div className="flex items-center justify-center mb-4">
@@ -409,20 +409,20 @@ export default function Home() {
                       </div>
                     </div>
                   ) : (
-                    <div className="text-center">
-                      <i className="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
-                      <p className="text-lg font-medium text-gray-600 mb-2">
+                    <div className="text-center w-full">
+                      <i className="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-3"></i>
+                      <p className="text-base font-medium text-gray-600 mb-2">
                         Upload a file to get started
                       </p>
-                      <p className="text-sm text-gray-500 mb-4">
-                        Supports TXT, CSV, PDF, and Word documents
+                      <p className="text-xs text-gray-500 mb-3">
+                        Supports TXT, PDF, and Word documents
                       </p>
-                      <label className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer">
+                      <label className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer text-sm">
                         <i className="fas fa-file-upload mr-2"></i>
                         Choose File
                         <input
                           type="file"
-                          accept=".txt,.csv,.pdf,.doc,.docx"
+                          accept=".txt,.pdf,.doc,.docx"
                           onChange={handleFileUpload}
                           className="hidden"
                         />
