@@ -24,7 +24,7 @@ interface Feature {
   title: string;
   description: string;
 }
-
+//trigger 
 
 const inputMethods: InputMethod[] = [
   { id: 'text', name: 'Text', icon: 'fas fa-font' },
