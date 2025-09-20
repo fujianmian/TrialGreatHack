@@ -9,6 +9,14 @@ interface Flashcard {
   category?: string;
 }
 
+interface AIResponse {
+  result: Array<{
+    front: string;
+    back: string;
+    category: string;
+  }>;
+}
+
 interface TextToCardProps {
   inputText: string;
   onBack: () => void;
@@ -21,6 +29,7 @@ export default function TextToCard({ inputText, onBack }: TextToCardProps) {
   const [isGenerating, setIsGenerating] = useState(true);
   const [studyMode, setStudyMode] = useState<'all' | 'incorrect'>('all');
   const [incorrectCards, setIncorrectCards] = useState<Set<number>>(new Set());
+  const [error, setError] = useState<string | null>(null);
 
   // Add Font Awesome to head
   useEffect(() => {
@@ -41,48 +50,60 @@ export default function TextToCard({ inputText, onBack }: TextToCardProps) {
     }
   }, [inputText]);
 
-  const generateFlashcards = () => {
+  const generateFlashcards = async () => {
     setIsGenerating(true);
+    setError(null);
     
-    // Simulate AI processing delay
-    setTimeout(() => {
-      // Mock flashcard generation based on input text
-      const mockFlashcards: Flashcard[] = [
+    try {
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: inputText
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate flashcards');
+      }
+
+      const data: AIResponse = await response.json();
+      
+      // Convert AI response to flashcard format
+      const generatedFlashcards: Flashcard[] = data.result.map((item, index) => ({
+        id: index + 1,
+        front: item.front,
+        back: item.back,
+        category: item.category
+      }));
+
+      setFlashcards(generatedFlashcards);
+      setIsGenerating(false);
+    } catch (err) {
+      console.error('Error generating flashcards:', err);
+      setError(err instanceof Error ? err.message : 'Failed to generate flashcards');
+      setIsGenerating(false);
+      
+      // Fallback to mock data if AI fails
+      const fallbackFlashcards: Flashcard[] = [
         {
           id: 1,
-          front: "What is quantum computing?",
-          back: "Quantum computing is a type of computation that harnesses quantum mechanical phenomena to process information in ways that classical computers cannot.",
-          category: "Definition"
+          front: "What is the main topic?",
+          back: "This content discusses various concepts and terminology.",
+          category: "General"
         },
         {
           id: 2,
-          front: "What are qubits?",
-          back: "Qubits (quantum bits) are the basic units of quantum information that can exist in superposition, representing both 0 and 1 simultaneously.",
-          category: "Key Concept"
-        },
-        {
-          id: 3,
-          front: "What is quantum superposition?",
-          back: "Quantum superposition is the ability of quantum particles to exist in multiple states at the same time until they are measured or observed.",
-          category: "Key Concept"
-        },
-        {
-          id: 4,
-          front: "What are the main applications of quantum computing?",
-          back: "Cryptography, drug discovery, financial modeling, optimization problems, and artificial intelligence are key applications of quantum computing.",
-          category: "Applications"
-        },
-        {
-          id: 5,
-          front: "What is quantum entanglement?",
-          back: "Quantum entanglement is a phenomenon where particles become interconnected and the state of one particle instantly influences the state of another, regardless of distance.",
-          category: "Key Concept"
+          front: "What are the key concepts?",
+          back: "The key concepts include important terms and definitions from the content.",
+          category: "General"
         }
       ];
-      
-      setFlashcards(mockFlashcards);
-      setIsGenerating(false);
-    }, 2000);
+      setFlashcards(fallbackFlashcards);
+    }
   };
 
   const nextCard = () => {
@@ -153,6 +174,36 @@ export default function TextToCard({ inputText, onBack }: TextToCardProps) {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 rounded-full mb-6">
+            <i className="fas fa-exclamation-triangle text-3xl text-red-600"></i>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Error Generating Flashcards</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <div className="flex gap-4 justify-center">
+            <button
+              onClick={generateFlashcards}
+              className="px-6 py-3 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
+            >
+              <i className="fas fa-redo mr-2"></i>
+              Try Again
+            </button>
+            <button
+              onClick={onBack}
+              className="px-6 py-3 rounded-full border-2 border-gray-300 text-gray-700 font-semibold hover:border-blue-600 hover:text-blue-600 hover:bg-blue-50 transition-all duration-300"
+            >
+              <i className="fas fa-arrow-left mr-2"></i>
+              Back to Main
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (getFilteredCards().length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
@@ -189,29 +240,29 @@ export default function TextToCard({ inputText, onBack }: TextToCardProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      {/* Enhanced Header */}
-      <header className="bg-gradient-to-r from-white/90 to-blue-50/90 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10 shadow-lg">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={onBack}
-                className="group p-3 rounded-xl hover:bg-gray-100 transition-all duration-300 hover:-translate-x-1"
-              >
-                <i className="fas fa-arrow-left text-xl text-gray-700 group-hover:text-blue-600 transition-colors"></i>
-              </button>
+        {/* Enhanced Header */}
+        <header className="bg-gradient-to-r from-white/90 to-blue-50/90 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10 shadow-lg">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-lg">
-                  <i className="fas fa-layer-group text-2xl text-white"></i>
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                    Flashcard Study
-                  </h1>
-                  <p className="text-sm text-gray-600">Interactive learning experience</p>
+                <button
+                  onClick={onBack}
+                  className="group p-3 rounded-xl hover:bg-gray-100 transition-all duration-300 hover:-translate-x-1"
+                >
+                  <i className="fas fa-arrow-left text-xl text-gray-700 group-hover:text-blue-600 transition-colors"></i>
+                </button>
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-lg">
+                    <i className="fas fa-layer-group text-2xl text-white"></i>
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                      Flashcard Study
+                    </h1>
+                    <p className="text-sm text-gray-600">AI-generated interactive learning</p>
+                  </div>
                 </div>
               </div>
-            </div>
             
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-3">

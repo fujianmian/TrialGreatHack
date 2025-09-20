@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import TextToCard from './texttocard';
+import TextToCard from './texttocard/texttocard';
+import TextToSummary from './texttosummary/texttosummary';
 
 interface InputMethod {
   id: string;
@@ -71,6 +72,7 @@ export default function Home() {
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showFlashcards, setShowFlashcards] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
 
   // Add Font Awesome to head
   useEffect(() => {
@@ -88,6 +90,12 @@ export default function Home() {
     // Check if flashcards are selected
     if (selectedOutputOption === 'flashcards') {
       setShowFlashcards(true);
+      return;
+    }
+
+    // Check if summary is selected
+    if (selectedOutputOption === 'summary') {
+      setShowSummary(true);
       return;
     }
 
@@ -122,9 +130,18 @@ export default function Home() {
     setShowFlashcards(false);
   };
 
+  const handleBackFromSummary = () => {
+    setShowSummary(false);
+  };
+
   // Show flashcard component if flashcards are selected
   if (showFlashcards) {
     return <TextToCard inputText={inputText} onBack={handleBackFromFlashcards} />;
+  }
+
+  // Show summary component if summary is selected
+  if (showSummary) {
+    return <TextToSummary inputText={inputText} onBack={handleBackFromSummary} />;
   }
 
   return (
