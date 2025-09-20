@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
 
-// Initialize Bedrock client: to trigger build
+// Initialize Bedrock client: to trigger
 const client = new BedrockRuntimeClient({
   region: "us-east-1", // Ensure the region matches
 });
