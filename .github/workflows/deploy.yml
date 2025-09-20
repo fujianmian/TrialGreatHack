@@ -60,5 +60,6 @@ jobs:
             aws ecs update-service \
             --cluster my-ecs-cluster \
             --service nextjs-task-service-v0fg7npw \
+            --health-check-grace-period-seconds 60 \
             --task-definition "${{ steps.task-def.outputs.taskdef_arn }}" \
             --force-new-deployment
