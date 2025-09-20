@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import TextToCard from './ttocard/texttocard';
 import TextToSummary from './ttosummary/texttosummary';
 import TextToMap from './ttomap/texttomap';
@@ -79,6 +79,9 @@ export default function Home() {
   const [showQuiz, setShowQuiz] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
+  
+  // Ref for the main content section to scroll to
+  const mainContentRef = useRef<HTMLDivElement>(null);
 
   // Add Font Awesome to head
   useEffect(() => {
@@ -209,6 +212,15 @@ export default function Home() {
     }
   };
 
+  const scrollToMainContent = () => {
+    if (mainContentRef.current) {
+      mainContentRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }
+  };
+
   // Show flashcard component if flashcards are selected
   if (showFlashcards) {
     return <TextToCard inputText={inputText} onBack={handleBackFromFlashcards} />;
@@ -319,7 +331,10 @@ export default function Home() {
               Generate educational videos, detailed notes, flashcards, and more from any content with our powerful AI assistant.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="px-10 py-4 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-semibold text-lg hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
+              <button 
+                onClick={scrollToMainContent}
+                className="px-10 py-4 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-semibold text-lg hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
+              >
                 <i className="fas fa-rocket mr-3"></i>
                 Get Started for Free
               </button>
@@ -332,7 +347,7 @@ export default function Home() {
         </section>
         
         {/* Enhanced Main Content */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-16">
+        <div ref={mainContentRef} className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-16">
           {/* Input Section */}
           <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20 hover:shadow-2xl transition-all duration-300">
             <h2 className="text-2xl md:text-3xl mb-6 text-blue-600 flex items-center gap-3 font-bold">
