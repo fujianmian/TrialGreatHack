@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import TextToCard from './texttocard';
 
 interface InputMethod {
   id: string;
@@ -69,6 +70,7 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showFlashcards, setShowFlashcards] = useState(false);
 
   // Add Font Awesome to head
   useEffect(() => {
@@ -83,6 +85,12 @@ export default function Home() {
   }, []);
 
   const handleGenerate = () => {
+    // Check if flashcards are selected
+    if (selectedOutputOption === 'flashcards') {
+      setShowFlashcards(true);
+      return;
+    }
+
     setIsGenerating(true);
     setGeneratedContent(null);
     
@@ -109,6 +117,15 @@ export default function Home() {
       setGeneratedContent(mockContent);
     }, 2000);
   };
+
+  const handleBackFromFlashcards = () => {
+    setShowFlashcards(false);
+  };
+
+  // Show flashcard component if flashcards are selected
+  if (showFlashcards) {
+    return <TextToCard inputText={inputText} onBack={handleBackFromFlashcards} />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 text-gray-800">
