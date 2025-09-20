@@ -49,7 +49,7 @@ function generateFlashcards(text: string, questionCount: number, difficulty: str
   const flashcards: Array<{id: number, front: string, back: string, category: string}> = [];
   
   // Extract key concepts and terms from the text
-  const concepts = extractKeyConcepts(text);
+  const concepts = extractKeyConcepts(text, questionCount);
   
   // Create flashcards for each concept
   concepts.forEach((concept, index) => {
@@ -71,7 +71,7 @@ function generateFlashcards(text: string, questionCount: number, difficulty: str
 }
 
 // Extract key concepts from text - focus on meaningful terms and phrases
-function extractKeyConcepts(text: string): Array<{term: string, category: string, context: string}> {
+function extractKeyConcepts(text: string, questionCount: number = 15): Array<{term: string, category: string, context: string}> {
   const concepts: Array<{term: string, category: string, context: string}> = [];
   
   // Extract technical terms and important phrases
