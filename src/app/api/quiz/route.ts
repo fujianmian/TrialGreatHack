@@ -104,6 +104,21 @@ function isUnimportantWord(word: string): boolean {
 // AI-powered quiz generation using AWS Bedrock
 async function generateAIQuiz(text: string) {
   console.log("🤖 Attempting AWS Bedrock AI generation for quiz...");
+  console.log("🔍 Environment check:");
+  console.log("AWS_REGION:", process.env.AWS_REGION);
+  console.log("AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID ? "✅ Set" : "❌ Not set");
+  console.log("AWS_SECRET_ACCESS_KEY:", process.env.AWS_SECRET_ACCESS_KEY ? "✅ Set" : "❌ Not set");
+  
+  // List of models to try in order of preference
+  // Using Amazon Nova Pro as primary model with fallbacks
+  const modelsToTry = [
+    'amazon.nova-pro-v1:0',
+    'amazon.nova-lite-v1:0',
+    'anthropic.claude-3-haiku-20240307-v1:0',
+    'anthropic.claude-3-sonnet-20240229-v1:0'
+  ];
+  
+  console.log("🎯 Models to try:", modelsToTry);
   
   try {
     // Dynamic import to handle potential module not found errors
@@ -152,52 +167,130 @@ Return as JSON array:
 Text to analyze:
 ${text}`;
 
-    const input = {
-      modelId: 'anthropic.claude-3-sonnet-20240229-v1:0',
-      contentType: 'application/json',
-      accept: 'application/json',
-      body: JSON.stringify({
-        anthropic_version: 'bedrock-2023-05-31',
-        max_tokens: 3000,
-        temperature: 0.3,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ]
-      })
-    };
-
-    const command = new InvokeModelCommand(input);
-    const response = await client.send(command);
-    
-    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-    const aiResponse = responseBody.content[0].text;
-
-    console.log("✅ AWS Bedrock response received for quiz");
-
-    // Parse the JSON response
-    try {
-      const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        const questions = JSON.parse(jsonMatch[0]);
+    // Try each model until one works
+    for (const modelId of modelsToTry) {
+      try {
+        console.log(`🔄 Trying model: ${modelId}`);
         
-        // Validate and clean the response
-        return questions.map((question: {question?: string, options?: string[], correctAnswer?: number, explanation?: string, category?: string}, index: number) => ({
-          id: index + 1,
-          question: question.question || `Question ${index + 1}`,
-          options: question.options || ["Option A", "Option B", "Option C", "Option D"],
-          correctAnswer: question.correctAnswer || 0,
-          explanation: question.explanation || "No explanation available",
-          category: question.category || "General"
-        }));
-      } else {
-        throw new Error("No valid JSON found in AI response");
+        // Different request format for Amazon Nova vs Anthropic Claude
+        let requestBody;
+        if (modelId.startsWith('amazon.nova')) {
+          // Amazon Nova format - content must be array of objects with text property
+          requestBody = {
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  {
+                    text: prompt
+                  }
+                ]
+              }
+            ],
+            inferenceConfig: {
+              maxTokens: 3000,
+              temperature: 0.3
+            }
+          };
+        } else {
+          // Anthropic Claude format
+          requestBody = {
+            anthropic_version: 'bedrock-2023-05-31',
+            max_tokens: 3000,
+            temperature: 0.3,
+            messages: [
+              {
+                role: 'user',
+                content: prompt
+              }
+            ]
+          };
+        }
+
+        const input = {
+          modelId: modelId,
+          contentType: 'application/json',
+          accept: 'application/json',
+          body: JSON.stringify(requestBody)
+        };
+
+        const command = new InvokeModelCommand(input);
+        const response = await client.send(command);
+        
+        const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+        
+        // Different response format for Amazon Nova vs Anthropic Claude
+        let aiResponse;
+        if (modelId.startsWith('amazon.nova')) {
+          // Amazon Nova format
+          aiResponse = responseBody.output.message.content[0].text;
+        } else {
+          // Anthropic Claude format
+          aiResponse = responseBody.content[0].text;
+        }
+
+        console.log(`✅ AWS Bedrock response received from ${modelId}`);
+
+        // Parse the JSON response
+        try {
+          const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
+          if (jsonMatch) {
+            const questions = JSON.parse(jsonMatch[0]);
+            
+            // Validate and clean the response
+            return questions.map((question: {question?: string, options?: string[], correctAnswer?: number, explanation?: string, category?: string}, index: number) => ({
+              id: index + 1,
+              question: question.question || `Question ${index + 1}`,
+              options: question.options || ["Option A", "Option B", "Option C", "Option D"],
+              correctAnswer: question.correctAnswer || 0,
+              explanation: question.explanation || "No explanation available",
+              category: question.category || "General"
+            }));
+          } else {
+            throw new Error("No valid JSON found in AI response");
+          }
+        } catch (parseError) {
+          console.error("Failed to parse AI response:", parseError);
+          throw new Error("Failed to parse AI response");
+        }
+        
+      } catch (modelError) {
+        const errorMessage = modelError instanceof Error ? modelError.message : String(modelError);
+        console.warn(`❌ Model ${modelId} failed:`, errorMessage);
+        
+        // Provide helpful guidance based on the error
+        if (errorMessage.includes("don't have access")) {
+          console.log("💡 TIP: You don't have access to this model. Try:");
+          console.log("   1. Check your AWS Bedrock model access in the AWS Console");
+          if (modelId.includes('nova')) {
+            console.log("   2. Request access to Amazon Nova models in AWS Bedrock");
+          } else {
+            console.log("   2. Request access to Claude models in AWS Bedrock");
+          }
+          console.log("   3. Verify your AWS credentials have the necessary permissions");
+        } else if (errorMessage.includes("invalid")) {
+          console.log("💡 TIP: Model identifier is invalid. This might be a temporary issue or the model ID has changed.");
+          if (modelId.includes('nova')) {
+            console.log("   Nova Pro model ID: amazon.nova-pro-v1:0");
+            console.log("   Nova Lite model ID: amazon.nova-lite-v1:0");
+          }
+        }
+        
+        // Log detailed error information for debugging
+        if (modelError instanceof Error) {
+          console.log("Error details:", {
+            name: modelError.name,
+            message: modelError.message
+          });
+        }
+        
+        if (modelId === modelsToTry[modelsToTry.length - 1]) {
+          // If this was the last model, throw the error with helpful message
+          throw new Error(`All AI models failed. Last error: ${errorMessage}. Please check your AWS Bedrock access and permissions.`);
+        }
+        // Otherwise, continue to the next model
+        continue;
       }
-    } catch (parseError) {
-      console.error("Failed to parse AI response:", parseError);
-      throw new Error("Failed to parse AI response");
     }
 
   } catch (awsError) {

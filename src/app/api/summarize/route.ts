@@ -99,6 +99,21 @@ function generateSummary(text: string) {
 // AI-powered summary generation using AWS Bedrock
 async function generateAISummary(text: string) {
   console.log("🤖 Attempting AWS Bedrock AI summarization...");
+  console.log("🔍 Environment check:");
+  console.log("AWS_REGION:", process.env.AWS_REGION);
+  console.log("AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID ? "✅ Set" : "❌ Not set");
+  console.log("AWS_SECRET_ACCESS_KEY:", process.env.AWS_SECRET_ACCESS_KEY ? "✅ Set" : "❌ Not set");
+  
+  // List of models to try in order of preference
+  // Using Amazon Nova Pro as primary model with fallbacks
+  const modelsToTry = [
+    'amazon.nova-pro-v1:0',
+    'amazon.nova-lite-v1:0',
+    'anthropic.claude-3-haiku-20240307-v1:0',
+    'anthropic.claude-3-sonnet-20240229-v1:0'
+  ];
+  
+  console.log("🎯 Models to try:", modelsToTry);
   
   try {
     // Dynamic import to handle potential module not found errors
