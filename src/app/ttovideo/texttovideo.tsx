@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 interface VideoSlide {
   id: number;
@@ -30,35 +30,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  useEffect(() => {
-    if (inputText.trim()) {
-      generateVideo();
-    }
-  }, [inputText]);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPlaying && video) {
-      interval = setInterval(() => {
-        setProgress(prev => {
-          const newProgress = prev + 100 / (video.slides[currentSlide].duration * 10);
-          if (newProgress >= 100) {
-            if (currentSlide < video.slides.length - 1) {
-              setCurrentSlide(prev => prev + 1);
-              return 0;
-            } else {
-              setIsPlaying(false);
-              return 100;
-            }
-          }
-          return newProgress;
-        });
-      }, 100);
-    }
-    return () => clearInterval(interval);
-  }, [isPlaying, currentSlide, video]);
-
-  const generateVideo = async () => {
+  const generateVideo = useCallback(async () => {
     setIsGenerating(true);
     setError(null);
 
@@ -82,7 +54,35 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [inputText]);
+
+  useEffect(() => {
+    if (inputText.trim()) {
+      generateVideo();
+    }
+  }, [inputText, generateVideo]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isPlaying && video) {
+      interval = setInterval(() => {
+        setProgress(prev => {
+          const newProgress = prev + 100 / (video.slides[currentSlide].duration * 10);
+          if (newProgress >= 100) {
+            if (currentSlide < video.slides.length - 1) {
+              setCurrentSlide(prev => prev + 1);
+              return 0;
+            } else {
+              setIsPlaying(false);
+              return 100;
+            }
+          }
+          return newProgress;
+        });
+      }, 100);
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, currentSlide, video]);
 
   const playPause = () => {
     if (video && currentSlide < video.slides.length) {

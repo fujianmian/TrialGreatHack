@@ -275,7 +275,6 @@ function generateConceptExplanation(concept: {term: string, category: string, co
 
 // Categorize a term based on its context
 function categorizeTerm(term: string, context: string): string {
-  const lowerTerm = term.toLowerCase();
   const lowerContext = context.toLowerCase();
   
   if (lowerContext.includes('definition') || lowerContext.includes('means') || lowerContext.includes('refers to')) {
@@ -519,7 +518,7 @@ ${text}`;
             const flashcards = JSON.parse(jsonMatch[0]);
             
             // Validate and clean the response
-            return flashcards.map((card: any, index: number) => {
+            return flashcards.map((card: {front?: string, back?: string, category?: string}, index: number) => {
               // Ensure front is maximum 2 words
               const frontWords = (card.front || `Question ${index + 1}`).split(' ');
               const front = frontWords.length > 2 ? frontWords.slice(0, 2).join(' ') : card.front || `Question ${index + 1}`;

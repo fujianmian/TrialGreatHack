@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 interface MindMapNode {
   id: string;
@@ -32,13 +32,7 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (inputText.trim()) {
-      generateMindMap();
-    }
-  }, [inputText]);
-
-  const generateMindMap = async () => {
+  const generateMindMap = useCallback(async () => {
     setIsGenerating(true);
     setError(null);
 
@@ -62,7 +56,7 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [inputText]);
 
   const getNodeColor = (level: number) => {
     const colors = [
@@ -76,17 +70,11 @@ export default function TextToMap({ inputText, onBack }: TextToMapProps) {
     return colors[Math.min(level, colors.length - 1)];
   };
 
-  const getNodeSize = (level: number) => {
-    const sizes = [
-      'w-32 h-16',        // Level 0 - Main topic
-      'w-28 h-14',        // Level 1 - Primary branches
-      'w-24 h-12',        // Level 2 - Secondary branches
-      'w-20 h-10',        // Level 3 - Tertiary branches
-      'w-16 h-8',         // Level 4 - Details
-      'w-14 h-7',         // Level 5+ - More details
-    ];
-    return sizes[Math.min(level, sizes.length - 1)];
-  };
+  useEffect(() => {
+    if (inputText.trim()) {
+      generateMindMap();
+    }
+  }, [inputText, generateMindMap]);
 
   const getTextSize = (level: number) => {
     const sizes = [

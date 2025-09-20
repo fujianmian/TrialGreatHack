@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 interface SummaryResponse {
   summary: string;
@@ -20,13 +20,7 @@ export default function TextToSummary({ inputText, onBack }: TextToSummaryProps)
   const [error, setError] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (inputText.trim()) {
-      generateSummary();
-    }
-  }, [inputText]);
-
-  const generateSummary = async () => {
+  const generateSummary = useCallback(async () => {
     setIsGenerating(true);
     setError(null);
 
@@ -50,7 +44,13 @@ export default function TextToSummary({ inputText, onBack }: TextToSummaryProps)
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [inputText]);
+
+  useEffect(() => {
+    if (inputText.trim()) {
+      generateSummary();
+    }
+  }, [inputText, generateSummary]);
 
   const copyToClipboard = async (text: string, type: string = 'text') => {
     try {

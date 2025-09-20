@@ -25,13 +25,6 @@ interface Feature {
   description: string;
 }
 
-interface GeneratedContent {
-  type: string;
-  title: string;
-  content: string;
-  keyPoints: string[];
-  applications: string[];
-}
 
 const inputMethods: InputMethod[] = [
   { id: 'text', name: 'Text', icon: 'fas fa-font' },
