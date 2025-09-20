@@ -23,4 +23,5 @@ COPY --from=builder /app/public ./public
 EXPOSE 3000
 
 # Start Next.js in production mode
-CMD ["npx", "next", "start", "-p", "3000"]
+CMD ["npx", "next", "start", "-p", "3000", "-H", "0.0.0.0"]
+
