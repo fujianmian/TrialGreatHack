@@ -167,7 +167,8 @@ async function generateAIQuiz(text: string, questionCount: number, difficulty: s
     function createBedrockClient() {
       if (process.env.ECS_CONTAINER_METADATA_URI || process.env.ECS_CONTAINER_METADATA_URI_V4) {
         // Running in ECS → rely on Task Role automatically
-        return new BedrockRuntimeClient({ region: "ap-southeast-5" });
+        console.log("able to check LOCAL OR ECSSSSSSSSSSSSSSSSSSSSs");
+        return new BedrockRuntimeClient({ region: "us-east-1" });
       } else {
         // Running locally → use env credentials
         return new BedrockRuntimeClient({
