@@ -89,49 +89,64 @@ export default function Home() {
     };
   }, []);
 
+  // Logger for mounting
+  useEffect(() => {
+    console.log('[Home] Mounted');
+    return () => {
+      console.log('[Home] Unmounted');
+    };
+  }, []);
+
   const handleGenerate = () => {
+    console.log('[Home] handleGenerate called. Output option:', selectedOutputOption);
     // Reset all show states first
     setShowFlashcards(false);
     setShowSummary(false);
     setShowMindMap(false);
     setShowVideo(false);
     setShowQuiz(false);
-    
+
     // Check if flashcards are selected
     if (selectedOutputOption === 'flashcards') {
+      console.log('[Home] Showing flashcards for input:', inputText);
       setShowFlashcards(true);
       return;
     }
 
     // Check if summary is selected
     if (selectedOutputOption === 'summary') {
+      console.log('[Home] Showing summary for input:', inputText);
       setShowSummary(true);
       return;
     }
 
     // Check if mind map is selected
     if (selectedOutputOption === 'mindmap') {
+      console.log('[Home] Showing mind map for input:', inputText);
       setShowMindMap(true);
       return;
     }
 
     // Check if video is selected
     if (selectedOutputOption === 'video') {
+      console.log('[Home] Showing video for input:', inputText);
       setShowVideo(true);
       return;
     }
 
     // Check if quiz is selected
     if (selectedOutputOption === 'quiz') {
+      console.log('[Home] Showing quiz for input:', inputText);
       setShowQuiz(true);
       return;
     }
 
     setIsGenerating(true);
-    
+    console.log('[Home] Generating output for:', selectedOutputOption, 'with input:', inputText);
     // Simulate loading delay with more realistic content
     setTimeout(() => {
       setIsGenerating(false);
+      console.log('[Home] Generation finished');
     }, 2000);
   };
 
@@ -155,51 +170,69 @@ export default function Home() {
     setShowQuiz(false);
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      console.log('[Home] File uploaded:', file.name, 'type:', file.type);
       setUploadedFile(file);
-      
+
       // Read file content based on file type
       const reader = new FileReader();
       reader.onload = (e) => {
         const content = e.target?.result as string;
+        console.log('[Home] FileReader loaded content:', content?.slice(0, 100));
         setFileContent(content);
         setInputText(content); // Update the main input text
       };
-      
+
       if (file.type === 'text/plain' || file.type === 'text/csv') {
         reader.readAsText(file);
       } else if (file.type === 'application/pdf') {
-        // For PDF files, we'll show a message that PDF support is coming
-        setFileContent('PDF file uploaded. PDF text extraction coming soon!');
-        setInputText('PDF file uploaded. PDF text extraction coming soon!');
+        // Define a placeholder function for extractPdfText
+                const text = await extractPdfText(file);
+        
+        async function extractPdfText(file: File): Promise<string> {
+          // Placeholder implementation for extracting text from a PDF
+          return "Extracted text from PDF (placeholder)";
+        }
+        console.log('[Home] PDF extracted text:', text?.slice(0, 100));
+        setFileContent(text);
+        setInputText(text);
       } else if (file.type.includes('word') || file.type.includes('document')) {
-        // For Word documents
-        setFileContent('Word document uploaded. Document text extraction coming soon!');
-        setInputText('Word document uploaded. Document text extraction coming soon!');
+        const text = await extractWordText(file);
+
+        async function extractWordText(file: File): Promise<string> {
+          // Placeholder implementation for extracting text from a Word document
+          return "Extracted text from Word document (placeholder)";
+        }
+        console.log('[Home] Word extracted text:', text?.slice(0, 100));
+        setFileContent(text);
+        setInputText(text);
       } else {
         setFileContent('File uploaded successfully!');
         setInputText('File uploaded successfully!');
+        console.log('[Home] Unknown file type, set generic content');
       }
     }
   };
 
   const handleRemoveFile = () => {
+    console.log('[Home] Removing uploaded file');
     setUploadedFile(null);
     setFileContent('');
     setInputText('');
   };
 
   const handleInputMethodChange = (methodId: string) => {
+    console.log('[Home] Input method changed:', methodId);
     setSelectedInputMethod(methodId);
-    
+
     // Reset file-related state when switching away from upload
     if (methodId !== 'upload') {
       setUploadedFile(null);
       setFileContent('');
     }
-    
+
     // Reset input text when switching to a new method (except upload)
     if (methodId !== 'upload' && methodId !== selectedInputMethod) {
       setInputText('');
@@ -207,6 +240,7 @@ export default function Home() {
   };
 
   const scrollToMainContent = () => {
+    console.log('[Home] Scrolling to main content');
     if (mainContentRef.current) {
       mainContentRef.current.scrollIntoView({
         behavior: 'smooth',

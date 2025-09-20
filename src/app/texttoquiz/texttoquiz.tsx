@@ -34,10 +34,18 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<number>>(new Set());
   const [userAnswers, setUserAnswers] = useState<Map<number, number>>(new Map());
 
+  // Logger for props
+  useEffect(() => {
+    console.log('[TextToQuiz] Mounted with props:', { inputText, questionCount, difficulty });
+    return () => {
+      console.log('[TextToQuiz] Unmounted');
+    };
+  }, []);
+
   const generateQuiz = useCallback(async () => {
     setIsGenerating(true);
     setError(null);
-    
+    console.log('[TextToQuiz] Starting quiz generation', { inputText, questionCount, difficulty });
     try {
       const response = await fetch('/api/quiz', {
         method: 'POST',
@@ -51,19 +59,22 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
         }),
       });
 
+      console.log('[TextToQuiz] API request sent');
       if (!response.ok) {
         const errorData = await response.json();
+        console.warn('[TextToQuiz] API error response:', errorData);
         throw new Error(errorData.error || 'Failed to generate quiz');
       }
 
       const data: AIResponse = await response.json();
+      console.log('[TextToQuiz] API response received:', data);
       setQuestions(data.result);
       setIsGenerating(false);
+      console.log('[TextToQuiz] Quiz questions set:', data.result);
     } catch (err) {
-      console.error('Error generating quiz:', err);
+      console.error('[TextToQuiz] Error generating quiz:', err);
       setError(err instanceof Error ? err.message : 'Failed to generate quiz');
       setIsGenerating(false);
-      
       // Fallback to mock data if API fails
       const generateFallbackQuestions = (count: number, difficulty: string): QuizQuestion[] => {
         const baseQuestions = [
@@ -103,7 +114,6 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
             category: "Advanced"
           }
         ];
-
         // Generate questions based on difficulty and count
         const questions: QuizQuestion[] = [];
         for (let i = 0; i < count; i++) {
@@ -117,58 +127,86 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
         }
         return questions;
       };
-
       const fallbackQuestions = generateFallbackQuestions(questionCount, difficulty);
+      console.log('[TextToQuiz] Using fallback questions:', fallbackQuestions);
       setQuestions(fallbackQuestions);
     }
   }, [inputText, questionCount, difficulty]);
 
   useEffect(() => {
     if (inputText) {
+      console.log('[TextToQuiz] inputText changed, generating quiz...');
       generateQuiz();
     }
   }, [inputText, generateQuiz]);
 
   const handleAnswerSelect = (answerIndex: number) => {
     if (showResult || quizCompleted) return;
+    console.log('[TextToQuiz] Answer selected:', answerIndex);
     setSelectedAnswer(answerIndex);
   };
 
   const handleSubmitAnswer = () => {
     if (selectedAnswer === null) return;
-    
     const currentQuestion = questions[currentQuestionIndex];
     const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
-    
+    console.log('[TextToQuiz] Submitting answer:', {
+      questionIndex: currentQuestionIndex,
+      selectedAnswer,
+      isCorrect
+    });
     if (isCorrect) {
-      setScore(prev => prev + 1);
+      setScore(prev => {
+        const newScore = prev + 1;
+        console.log('[TextToQuiz] Score updated:', newScore);
+        return newScore;
+      });
     }
-    
-    setUserAnswers(prev => new Map(prev.set(currentQuestionIndex, selectedAnswer)));
-    setAnsweredQuestions(prev => new Set([...prev, currentQuestionIndex]));
+    setUserAnswers(prev => {
+      const newAnswers = new Map(prev.set(currentQuestionIndex, selectedAnswer));
+      console.log('[TextToQuiz] User answers updated:', Array.from(newAnswers.entries()));
+      return newAnswers;
+    });
+    setAnsweredQuestions(prev => {
+      const newSet = new Set([...prev, currentQuestionIndex]);
+      console.log('[TextToQuiz] Answered questions updated:', Array.from(newSet));
+      return newSet;
+    });
     setShowResult(true);
+    console.log('[TextToQuiz] Show result set to true');
   };
 
   const handleNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(prev => prev + 1);
+      setCurrentQuestionIndex(prev => {
+        const nextIndex = prev + 1;
+        console.log('[TextToQuiz] Moving to next question:', nextIndex);
+        return nextIndex;
+      });
       setSelectedAnswer(null);
       setShowResult(false);
     } else {
       setQuizCompleted(true);
+      console.log('[TextToQuiz] Quiz completed!');
     }
   };
 
   const handlePreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1);
+      setCurrentQuestionIndex(prev => {
+        const prevIndex = prev - 1;
+        console.log('[TextToQuiz] Moving to previous question:', prevIndex);
+        return prevIndex;
+      });
       const previousAnswer = userAnswers.get(currentQuestionIndex - 1);
+      console.log('[TextToQuiz] Previous answer:', previousAnswer);
       setSelectedAnswer(previousAnswer !== undefined ? previousAnswer : null);
       setShowResult(answeredQuestions.has(currentQuestionIndex - 1));
     }
   };
 
   const resetQuiz = () => {
+    console.log('[TextToQuiz] Resetting quiz');
     setCurrentQuestionIndex(0);
     setSelectedAnswer(null);
     setShowResult(false);
@@ -179,6 +217,7 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
   };
 
   const retakeQuiz = () => {
+    console.log('[TextToQuiz] Retaking quiz');
     resetQuiz();
   };
 
