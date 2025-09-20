@@ -61,9 +61,10 @@ const features: Feature[] = [
 
 export default function Home() {
   const [selectedInputMethod, setSelectedInputMethod] = useState('text');
-  const [selectedOutputOption, setSelectedOutputOption] = useState('summary');
+  const [selectedOutputOption, setSelectedOutputOption] = useState<string>('');
   const [inputText, setInputText] = useState('Quantum computing is an area of computing focused on developing computer technology based on the principles of quantum theory. Quantum computers use quantum bits or qubits, which can represent both 0 and 1 simultaneously, unlike classical bits. This allows quantum computers to perform certain calculations much faster than traditional computers.');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showFlashcards, setShowFlashcards] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
@@ -73,6 +74,8 @@ export default function Home() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
   const [difficultyLevel, setDifficultyLevel] = useState<string>('Beginner');
+  const [recommendation, setRecommendation] = useState<string | null>(null);
+
   
   // Ref for the main content section to scroll to
   const mainContentRef = useRef<HTMLDivElement>(null);
@@ -96,6 +99,25 @@ export default function Home() {
       console.log('[Home] Unmounted');
     };
   }, []);
+
+
+  async function handleRecommendation() {
+    setLoading(true);
+    const res = await fetch("/api/recommend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userInput: inputText }),
+    });
+
+    const data = await res.json();
+    // Highlight the recommended option
+    if (data.recommendation) {
+      const normalized = data.recommendation.toLowerCase().trim();
+      setSelectedOutputOption(normalized);
+      setRecommendation(normalized); // 👈 add this
+    }
+    setLoading(false);
+  }
 
   const handleGenerate = () => {
     console.log('[Home] handleGenerate called. Output option:', selectedOutputOption);
@@ -545,6 +567,23 @@ export default function Home() {
                 </div>
               ))}
             </div>
+
+            <div className="text-center">
+              <button
+                onClick={handleRecommendation}
+                disabled={loading}
+                className="px-12 py-4 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-semibold text-lg hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              >
+                <i className={`fas ${loading ? 'fa-spinner fa-spin' : 'fa-bolt'} mr-3`}></i>
+                {loading ? 'Analyzing...' : 'Don’t know which to pick? Click here!'}
+              </button>
+              {!loading && recommendation && (
+                <p className="mt-2 text-sm text-gray-500 text-center">
+                  We recommend: <strong className="text-blue-600">{recommendation}</strong>
+                </p>
+              )}
+            </div>
+            
             
             <div className="bg-gray-50 rounded-xl p-4 mb-6">
               <h3 className="text-lg font-semibold mb-3 text-gray-700 flex items-center gap-2">
