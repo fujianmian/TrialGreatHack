@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface Flashcard {
   id: number;
@@ -43,14 +43,7 @@ export default function TextToCard({ inputText, onBack }: TextToCardProps) {
     };
   }, []);
 
-  // Generate flashcards from input text
-  useEffect(() => {
-    if (inputText) {
-      generateFlashcards();
-    }
-  }, [inputText]);
-
-  const generateFlashcards = async () => {
+  const generateFlashcards = useCallback(async () => {
     setIsGenerating(true);
     setError(null);
     
@@ -104,7 +97,14 @@ export default function TextToCard({ inputText, onBack }: TextToCardProps) {
       ];
       setFlashcards(fallbackFlashcards);
     }
-  };
+  }, [inputText]);
+
+  // Generate flashcards from input text
+  useEffect(() => {
+    if (inputText) {
+      generateFlashcards();
+    }
+  }, [inputText, generateFlashcards]);
 
   const nextCard = () => {
     setIsFlipped(false);

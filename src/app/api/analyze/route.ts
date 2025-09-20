@@ -44,7 +44,7 @@ export async function POST(req: Request) {
 
 // Generate flashcards from text content - concept-based approach
 function generateFlashcards(text: string) {
-  const flashcards: any[] = [];
+  const flashcards: Array<{id: number, front: string, back: string, category: string}> = [];
   
   // Extract key concepts and terms from the text
   const concepts = extractKeyConcepts(text);
@@ -58,6 +58,7 @@ function generateFlashcards(text: string) {
     const front = frontWords.length > 2 ? frontWords.slice(0, 2).join(' ') : concept.term;
     
     flashcards.push({
+      id: index + 1,
       front: front,
       back: explanation,
       category: concept.category
@@ -210,7 +211,7 @@ function extractKeyNouns(text: string): string[] {
     );
   
   const wordCount = new Map();
-  words.forEach(word => {
+  words.forEach((word) => {
     wordCount.set(word, (wordCount.get(word) || 0) + 1);
   });
   
