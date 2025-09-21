@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+function getBedrockClient() {
+  return new BedrockRuntimeClient({
+    region: process.env.AWS_REGION || "us-east-1",
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
+    },
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -68,31 +74,79 @@ Keep responses helpful and detailed but not overwhelming (typically 2-4 sentence
       }
     ];
 
-    let response = '';
+    const userPrompt = conversationContext
+      ? `Previous conversation:\n${conversationContext}\n\nUser: ${message}`
+      : `User: ${message}`;
 
-    try {
-      console.log(`🤖 Calling OpenAI API for chatbox`);
-      
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
-        messages: messages,
-        max_tokens: 300,
-        temperature: 0.7,
-        top_p: 0.9,
-      });
+    const payload = {
+      anthropic_version: "bedrock-2023-05-31",
+      max_tokens: 300,
+      temperature: 0.7,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `${systemPrompt}\n\n${userPrompt}`
+            }
+          ]
+        }
+      ]
+    };
 
-      response = completion.choices[0]?.message?.content || 'I apologize, but I had trouble generating a response. Please try again.';
-      
-      console.log(`✅ OpenAI response generated successfully`);
-      
-    } catch (error: any) {
-      console.error('❌ OpenAI API failed:', error.message);
-      response = getFallbackResponse(message);
+    const modelIds = [
+      "anthropic.claude-3-sonnet-20240229-v1:0",
+      "anthropic.claude-3-haiku-20240307-v1:0",
+      "anthropic.claude-3-opus-20240229-v1:0",
+      "anthropic.claude-v2:1",
+      "anthropic.claude-v2",
+    ];
+
+    let aiResponse = '';
+    let modelUsed = '';
+    let success = false;
+
+    for (const modelId of modelIds) {
+      try {
+        console.log(`🤖 Attempting to invoke Bedrock model: ${modelId}`);
+        const client = getBedrockClient();
+        const command = new InvokeModelCommand({
+          contentType: "application/json",
+          body: JSON.stringify(payload),
+          modelId: modelId,
+          accept: "application/json",
+        });
+
+        const apiResponse = await client.send(command);
+        const decodedResponseBody = new TextDecoder().decode(apiResponse.body);
+        const responseBody = JSON.parse(decodedResponseBody);
+
+        if (responseBody.content && responseBody.content.length > 0 && responseBody.content[0].text) {
+          aiResponse = responseBody.content[0].text;
+          modelUsed = modelId;
+          success = true;
+          console.log(`✅ Successfully invoked Bedrock model: ${modelId}`);
+          break;
+        }
+      } catch (error: any) {
+        console.error(`❌ Bedrock model ${modelId} failed:`, error.message);
+        if (error.name === 'AccessDeniedException' || error.message.includes('not subscribed')) {
+          console.error(`AWS Bedrock access denied or model not subscribed for ${modelId}. Please check AWS permissions and model subscriptions.`);
+          // Don't break, try next model
+        }
+      }
+    }
+
+    if (!success) {
+      aiResponse = getFallbackResponse(message);
+      modelUsed = 'fallback';
+      console.log(`⚠️ All Bedrock models failed. Using fallback response.`);
     }
 
     return NextResponse.json({
-      response: response.trim(),
-      model: 'gpt-3.5-turbo',
+      response: aiResponse.trim(),
+      model: modelUsed,
       timestamp: new Date().toISOString()
     });
 
