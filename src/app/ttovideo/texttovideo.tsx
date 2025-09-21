@@ -50,6 +50,71 @@ interface TextToVideoProps {
   onBack: () => void;
 }
 
+interface VideoPlayerProps {
+  video: any;
+  index: number;
+  onError: () => void;
+}
+
+const VideoPlayer = ({ video, index, onError }: VideoPlayerProps) => {
+  const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const handleError = (e: any) => {
+    console.error(`❌ Video ${index + 1} load error:`, e);
+    console.error(`Video URL: ${video.s3Url}`);
+    setHasError(true);
+    setIsLoading(false);
+    onError();
+  };
+
+  const handleLoadStart = () => {
+    console.log(`🎬 Video ${index + 1} load started:`, video.s3Url);
+    setIsLoading(true);
+    setHasError(false);
+  };
+
+  const handleCanPlay = () => {
+    console.log(`✅ Video ${index + 1} can play`);
+    setIsLoading(false);
+  };
+
+  if (hasError) {
+    return (
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-8">
+        <div className="text-center">
+          <i className="fas fa-exclamation-triangle text-4xl mb-4 text-red-400"></i>
+          <h3 className="text-xl font-bold mb-2">Video Load Error</h3>
+          <p className="text-sm">Video {index + 1} failed to load</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-800 rounded-xl">
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-400 border-t-transparent"></div>
+        </div>
+      )}
+      <video
+        key={video.s3Url}
+        controls
+        className="w-full h-full object-cover rounded-xl"
+        onError={handleError}
+        onLoadStart={handleLoadStart}
+        onCanPlay={handleCanPlay}
+        preload="metadata"
+        crossOrigin="anonymous"
+      >
+        <source src={video.s3Url} type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
+    </>
+  );
+};
+
 export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
   const [videoData, setVideoData] = useState<MultiVideoResponse | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -238,10 +303,15 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
     
     return videoData.videoJobs.map(job => {
       const status = videoStatuses[job.invocationArn];
+      const s3Url = status?.status === 'Completed' ? status.s3Url : null;
+      
+      // Validate S3 URL
+      const isValidUrl = s3Url && typeof s3Url === 'string' && s3Url.startsWith('http');
+      
       return {
         ...job,
         status: status?.status || 'InProgress',
-        s3Url: status?.status === 'Completed' ? status.s3Url : null,
+        s3Url: isValidUrl ? s3Url : null,
         error: status?.failureMessage || status?.error
       };
     });
@@ -283,7 +353,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
               <div className="space-y-2 text-sm text-gray-500">
                 <div className="flex items-center justify-center gap-2">
                   <i className="fas fa-brain text-purple-500"></i>
-                  <span>Analyzing content with OpenAI</span>
+                  <span>Analyzing content with Nova Pro</span>
                 </div>
                 <div className="flex items-center justify-center gap-2">
                   <i className="fas fa-film text-blue-500"></i>
@@ -502,20 +572,14 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
               return (
                 <div key={index} className="bg-white rounded-2xl shadow-2xl p-6">
                   <div className="aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl mb-4 relative overflow-hidden">
-                    {isCompleted ? (
-                      <video
-                        key={video.s3Url}
-                        controls
-                        className="w-full h-full object-cover rounded-xl"
-                        onError={(e) => console.error(`❌ Video ${index + 1} load error:`, e)}
-                        onLoadStart={() => console.log(`🎬 Video ${index + 1} load started:`, video.s3Url)}
-                        onCanPlay={() => console.log(`✅ Video ${index + 1} can play`)}
-                        preload="metadata"
-                        crossOrigin="anonymous"
-                      >
-                        <source src={video.s3Url} type="video/mp4" />
-                        Your browser does not support the video tag.
-                      </video>
+                    {isCompleted && video.s3Url ? (
+                      <VideoPlayer 
+                        video={video} 
+                        index={index}
+                        onError={() => {
+                          // This will be handled by the VideoPlayer component
+                        }}
+                      />
                     ) : (
                       <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-8">
                         <div className="text-center">
