@@ -219,6 +219,28 @@ async function generateAIMindMap(text: string) {
     // Dynamic import to handle potential module not found errors
     const { BedrockRuntimeClient, InvokeModelCommand } = await import('@aws-sdk/client-bedrock-runtime');
     
+    function createBedrockClient() {
+      console.log("ECS_CONTAINER_METADATA_URI", process.env.ECS_CONTAINER_METADATA_URI);
+      console.log("ECS_CONTAINER_METADATA_URI_V4", process.env.ECS_CONTAINER_METADATA_URI_V4);
+      console.log("region", process.env.REGION);
+
+      if (process.env.ECS_CONTAINER_METADATA_URI || process.env.ECS_CONTAINER_METADATA_URI_V4) {
+        // Running in ECS → rely on Task Role automatically
+        console.log("able to check LOCAL OR ECSSSSSSSSSSSSSSSSSSSSs");
+        return new BedrockRuntimeClient({ region: "us-east-1" });
+      } else {
+        // Running locally → use env credentials
+        console.log("not able to check LOCAL OR ECSSSSSSSSSSSSSSSSSSSSs");
+        return new BedrockRuntimeClient({
+          region: "us-east-1", // or your preferred region
+          credentials: {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "",
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "",
+          },
+        });
+      }
+    }
+
     const client = createBedrockClient();
 
     const prompt = `Please analyze the following text and create a mind map structure.
