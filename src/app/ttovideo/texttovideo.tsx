@@ -473,7 +473,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
     <div className="min-h-screen bg-gray-900 p-4">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="bg-gray-900 rounded-3xl px-8 shadow-lg border border-gray-700 p-6 mb-6">
+        <div className="bg-white rounded-3xl px-8 shadow-lg border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-3xl font-bold text-gray-800">AI Generated Video</h1>
             <button
@@ -490,72 +490,110 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
           </div>
         </div>
 
-        {/* Single Video Player */}
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-2xl p-6">
-            <div className="aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl mb-4 relative overflow-hidden">
-              {primaryVideo && primaryVideo.s3Url ? (
-                <video
-                  key={primaryVideo.s3Url}
-                  controls
-                  className="w-full h-full object-cover rounded-xl"
-                  onError={(e) => console.error(`❌ Video load error:`, e)}
-                  onLoadStart={() => console.log(`🎬 Video load started:`, primaryVideo.s3Url)}
-                  onCanPlay={() => console.log(`✅ Video can play`)}
-                  preload="metadata"
-                  crossOrigin="anonymous"
-                >
-                  <source src={primaryVideo.s3Url} type="video/mp4" />
-                  Your browser does not support the video tag.
-                </video>
-              ) : (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-8">
-                  <div className="text-center">
-                    <i className="fas fa-video text-6xl mb-4 text-blue-400"></i>
-                    <h3 className="text-2xl font-bold mb-4">Video Ready</h3>
-                    <p className="text-lg leading-relaxed">Your AI-generated video is ready to watch!</p>
+        {/* Three Video Players */}
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {[0, 1, 2].map((index) => {
+              const video = availableVideos[index] || null;
+              const isCompleted = video && video.status === 'Completed' && video.s3Url;
+              const isInProgress = video && video.status === 'InProgress';
+              const isFailed = video && (video.status === 'Failed' || video.error);
+              
+              return (
+                <div key={index} className="bg-white rounded-2xl shadow-2xl p-6">
+                  <div className="aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl mb-4 relative overflow-hidden">
+                    {isCompleted ? (
+                      <video
+                        key={video.s3Url}
+                        controls
+                        className="w-full h-full object-cover rounded-xl"
+                        onError={(e) => console.error(`❌ Video ${index + 1} load error:`, e)}
+                        onLoadStart={() => console.log(`🎬 Video ${index + 1} load started:`, video.s3Url)}
+                        onCanPlay={() => console.log(`✅ Video ${index + 1} can play`)}
+                        preload="metadata"
+                        crossOrigin="anonymous"
+                      >
+                        <source src={video.s3Url} type="video/mp4" />
+                        Your browser does not support the video tag.
+                      </video>
+                    ) : (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-8">
+                        <div className="text-center">
+                          {isInProgress ? (
+                            <>
+                              <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-400 border-t-transparent mx-auto mb-4"></div>
+                              <h3 className="text-xl font-bold mb-2">Processing...</h3>
+                              <p className="text-sm">Video {index + 1} is being generated</p>
+                            </>
+                          ) : isFailed ? (
+                            <>
+                              <i className="fas fa-exclamation-triangle text-4xl mb-4 text-red-400"></i>
+                              <h3 className="text-xl font-bold mb-2">Failed</h3>
+                              <p className="text-sm">Video {index + 1} generation failed</p>
+                            </>
+                          ) : (
+                            <>
+                              <i className="fas fa-video text-4xl mb-4 text-blue-400"></i>
+                              <h3 className="text-xl font-bold mb-2">Video {index + 1}</h3>
+                              <p className="text-sm">Waiting to start...</p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="text-center space-y-2">
+                    <h4 className="font-semibold text-gray-800 text-sm">
+                      {video?.title || `Video ${index + 1}`}
+                    </h4>
+                    
+                    <div className="flex items-center justify-center gap-2 text-xs text-gray-600">
+                      <span className="flex items-center gap-1">
+                        <i className="fas fa-video text-blue-500"></i>
+                        Duration: 6s
+                      </span>
+                      {videoData?.style && (
+                        <span className="flex items-center gap-1">
+                          <i className="fas fa-palette text-purple-500"></i>
+                          {videoData.style}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center justify-center">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        isCompleted ? 'bg-green-100 text-green-700' :
+                        isInProgress ? 'bg-yellow-100 text-yellow-700' :
+                        isFailed ? 'bg-red-100 text-red-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {isCompleted ? '✅ Ready' :
+                         isInProgress ? '⏳ Processing' :
+                         isFailed ? '❌ Failed' : '⏸️ Pending'}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
-            
-            <div className="text-center space-y-2">
-              <div className="flex items-center justify-center gap-4 text-sm text-gray-600">
-                <span className="flex items-center gap-1">
-                  <i className="fas fa-video text-blue-500"></i>
-                  Duration: 6s
-                </span>
-                {videoData?.style && (
-                  <span className="flex items-center gap-1">
-                    <i className="fas fa-palette text-purple-500"></i>
-                    Style: {videoData.style}
-                  </span>
-                )}
-                <span className="flex items-center gap-1">
-                  <i className="fas fa-expand text-green-500"></i>
-                  16:9 Aspect Ratio
-                </span>
-                <span className="flex items-center gap-1">
-                  <i className="fas fa-circle text-xs text-green-500"></i>
-                  Ready
-                </span>
-              </div>
-              
-              <p className="text-xs text-gray-500">
-                Powered by Amazon Nova Pro & Nova Reel AI • YouTube-ready quality
-              </p>
-            </div>
+              );
+            })}
+          </div>
+          
+          <div className="text-center mt-6">
+            <p className="text-sm text-gray-500">
+              Powered by Amazon Nova Pro & Nova Reel AI • YouTube-ready quality
+            </p>
           </div>
         </div>
 
         {/* Enhanced Video Breakdown */}
-        {primaryVideo && primaryVideo.shot && (
+        {videoData && videoData.videoJobs && videoData.videoJobs.length > 0 && (
           <div className="bg-white rounded-2xl shadow-2xl p-6 mt-6">
             <div className="mt-4 space-y-3">
               <div className="p-3 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-700">
                   <i className="fas fa-info-circle mr-2"></i>
-                  This video was generated using advanced AI analysis. Nova Pro analyzes your content to suggest specific backgrounds, visual elements, and scenes. Nova Reel then creates dynamic videos with contextual environments, relevant props, and professional cinematography - making each video unique and engaging rather than generic.
+                  These videos were generated using advanced AI analysis. Nova Pro analyzes your content to suggest specific backgrounds, visual elements, and scenes. Nova Reel then creates dynamic videos with contextual environments, relevant props, and professional cinematography - making each video unique and engaging rather than generic.
                 </p>
               </div>
               
@@ -605,50 +643,79 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
                   </div>
                 )}
                 
-                <div className="bg-white rounded-lg p-4 shadow-sm">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                      1
-                    </div>
-                    <div className="flex-1">
-                      <h5 className="font-medium text-gray-800 mb-2">{primaryVideo.shot.description || primaryVideo.title}</h5>
-                      <p className="text-sm text-gray-600 leading-relaxed mb-3">{primaryVideo.shot.prompt}</p>
-                      
-                      {/* Visual Details */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                        {primaryVideo.shot.background && (
-                          <div className="bg-gray-50 rounded p-2">
-                            <span className="font-medium text-gray-700">📍 Background:</span>
-                            <span className="ml-1 text-gray-600">{primaryVideo.shot.background}</span>
+                {/* Video Details for each video */}
+                <div className="space-y-4">
+                  {videoData.videoJobs.map((job, index) => {
+                    const videoStatus = videoStatuses[job.invocationArn];
+                    const isCompleted = videoStatus?.status === 'Completed' && videoStatus?.s3Url;
+                    const isInProgress = videoStatus?.status === 'InProgress';
+                    const isFailed = videoStatus?.status === 'Failed' || videoStatus?.failureMessage;
+                    
+                    return (
+                      <div key={job.shotId} className="bg-white rounded-lg p-4 shadow-sm">
+                        <div className="flex items-start gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${
+                            isCompleted ? 'bg-gradient-to-r from-green-500 to-green-600' :
+                            isInProgress ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' :
+                            isFailed ? 'bg-gradient-to-r from-red-500 to-red-600' :
+                            'bg-gradient-to-r from-gray-500 to-gray-600'
+                          }`}>
+                            {index + 1}
                           </div>
-                        )}
-                        {primaryVideo.shot.visual_elements && primaryVideo.shot.visual_elements.length > 0 && (
-                          <div className="bg-gray-50 rounded p-2">
-                            <span className="font-medium text-gray-700">🎨 Visual Elements:</span>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {primaryVideo.shot.visual_elements.map((element, idx) => (
-                                <span key={idx} className="bg-green-100 text-green-800 px-1 py-0.5 rounded text-xs">
-                                  {element}
-                                </span>
-                              ))}
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-2">
+                              <h5 className="font-medium text-gray-800">{job.shot.description || job.title}</h5>
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                isCompleted ? 'bg-green-100 text-green-700' :
+                                isInProgress ? 'bg-yellow-100 text-yellow-700' :
+                                isFailed ? 'bg-red-100 text-red-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {isCompleted ? '✅ Ready' :
+                                 isInProgress ? '⏳ Processing' :
+                                 isFailed ? '❌ Failed' : '⏸️ Pending'}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-600 leading-relaxed mb-3">{job.shot.prompt}</p>
+                            
+                            {/* Visual Details */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                              {job.shot.background && (
+                                <div className="bg-gray-50 rounded p-2">
+                                  <span className="font-medium text-gray-700">📍 Background:</span>
+                                  <span className="ml-1 text-gray-600">{job.shot.background}</span>
+                                </div>
+                              )}
+                              {job.shot.visual_elements && job.shot.visual_elements.length > 0 && (
+                                <div className="bg-gray-50 rounded p-2">
+                                  <span className="font-medium text-gray-700">🎨 Visual Elements:</span>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {job.shot.visual_elements.map((element, idx) => (
+                                      <span key={idx} className="bg-green-100 text-green-800 px-1 py-0.5 rounded text-xs">
+                                        {element}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {job.shot.camera_movement && (
+                                <div className="bg-gray-50 rounded p-2">
+                                  <span className="font-medium text-gray-700">📹 Camera:</span>
+                                  <span className="ml-1 text-gray-600">{job.shot.camera_movement}</span>
+                                </div>
+                              )}
+                              {job.shot.lighting && (
+                                <div className="bg-gray-50 rounded p-2">
+                                  <span className="font-medium text-gray-700">💡 Lighting:</span>
+                                  <span className="ml-1 text-gray-600">{job.shot.lighting}</span>
+                                </div>
+                              )}
                             </div>
                           </div>
-                        )}
-                        {primaryVideo.shot.camera_movement && (
-                          <div className="bg-gray-50 rounded p-2">
-                            <span className="font-medium text-gray-700">📹 Camera:</span>
-                            <span className="ml-1 text-gray-600">{primaryVideo.shot.camera_movement}</span>
-                          </div>
-                        )}
-                        {primaryVideo.shot.lighting && (
-                          <div className="bg-gray-50 rounded p-2">
-                            <span className="font-medium text-gray-700">💡 Lighting:</span>
-                            <span className="ml-1 text-gray-600">{primaryVideo.shot.lighting}</span>
-                          </div>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
