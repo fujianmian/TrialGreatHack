@@ -43,14 +43,8 @@ jobs:
             NEW_IMAGE="268060978153.dkr.ecr.ap-southeast-5.amazonaws.com/greataihack1:${{ github.sha }}"
             jq --arg IMAGE "$NEW_IMAGE" '
               del(.tags, .pidMode, .ipcMode, .proxyConfiguration, .inferenceAccelerators, .ephemeralStorage) |
-              .containerDefinitions[0].image=$IMAGE |
-              .cpu=32768 | 
-              .memory=65536
+              .containerDefinitions[0].image=$IMAGE
             ' taskdef.json > new-taskdef.json
-            
-            echo "🔹 Registering task definition..."
-              REGISTER_OUTPUT=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json)
-              echo "$REGISTER_OUTPUT" | tee register-output.json
 
             TASKDEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json | jq -r '.taskDefinition.taskDefinitionArn')
             echo "New task definition ARN: $TASKDEF_ARN"
@@ -64,7 +58,6 @@ jobs:
             echo $AWS_REGION
             echo $AWS_DEFAULT_REGION
             aws ecs update-service \
-            --region ap-southeast-5 \
             --cluster my-ecs-cluster \
             --service nextjs-task-service-v0fg7npw \
             --health-check-grace-period-seconds 60 \
