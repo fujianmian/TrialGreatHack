@@ -211,18 +211,34 @@ export default function Home() {
       if (file.type === 'text/plain' || file.type === 'text/csv') {
         reader.readAsText(file);
       } else if (file.type === 'application/pdf') {
-        // Define a placeholder function for extractPdfText
-                const text = await extractPdfText(file);
-        
-        async function extractPdfText(file: File): Promise<string> {
-          // Placeholder implementation for extracting text from a PDF
-          return "Extracted text from PDF (placeholder)";
-        }
-        console.log('[Home] PDF extracted text:', text?.slice(0, 100));
-        setFileContent(text);
-        setInputText(text);
-      } else if (file.type.includes('word') || file.type.includes('document')) {
-        const text = await extractWordText(file);
+        // Call your backend API route
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+          const response = await fetch('/api/extract-pdf', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to extract PDF text');
+          }
+
+          const data = await response.json();
+          console.log('[Home] PDF extracted text (raw):', data.extractedText?.slice(0, 100));
+          console.log('[Home] PDF processed content:', data.processedContent?.slice(0, 100));
+
+          setFileContent(data.extractedText);
+          setInputText(data.processedContent); // or use extractedText depending on your need
+        } catch (err) {
+          console.error('[Home] Error extracting PDF:', err);
+          setFileContent('Failed to extract PDF text.');
+          setInputText('');
+        }} 
+        else if (file.type.includes('word') || file.type.includes('document')) {
+              const text = await extractWordText(file);
 
         async function extractWordText(file: File): Promise<string> {
           // Placeholder implementation for extracting text from a Word document
