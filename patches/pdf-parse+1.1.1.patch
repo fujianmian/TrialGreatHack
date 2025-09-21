@@ -1,0 +1,30 @@
+diff --git a/node_modules/pdf-parse/index.js b/node_modules/pdf-parse/index.js
+index e9fc367..c53f393 100644
+--- a/node_modules/pdf-parse/index.js
++++ b/node_modules/pdf-parse/index.js
+@@ -3,24 +3,5 @@ const Pdf = require('./lib/pdf-parse.js');
+ 
+ module.exports = Pdf;
+ 
+-let isDebugMode = !module.parent; 
++// Debug block removed by patch-package to avoid build-time fs reads (removed to prevent ENOENT in bundlers).
+ 
+-//process.env.AUTO_KENT_DEBUG
+-
+-
+-//for testing purpose
+-if (isDebugMode) {
+-
+-    let PDF_FILE = './test/data/05-versions-space.pdf';
+-    let dataBuffer = Fs.readFileSync(PDF_FILE);
+-    Pdf(dataBuffer).then(function(data) {
+-        Fs.writeFileSync(`${PDF_FILE}.txt`, data.text, {
+-            encoding: 'utf8',
+-            flag: 'w'
+-        });
+-        debugger;
+-    }).catch(function(err) {
+-        debugger;
+-    });
+-
+-}

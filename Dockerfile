@@ -1,8 +1,11 @@
 # Stage 1: build
 FROM node:18-alpine AS builder
 WORKDIR /app
+
 # Copy package files first for caching
 COPY package*.json ./
+COPY package.json package-lock.json ./
+COPY patches ./patches
 RUN npm ci
 COPY . .
 RUN npm run build
