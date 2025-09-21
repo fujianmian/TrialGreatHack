@@ -62,48 +62,187 @@ Keep responses helpful and detailed but not overwhelming (typically 2-4 sentence
     let aiResponse = '';
     let modelUsed = '';
     let success = false;
+    let debugInfo: any = {};
+
+    // 🔍 DEBUG: Check environment variable
+    console.log('🔍 DEBUG: Environment check');
+    console.log('- NODE_ENV:', process.env.NODE_ENV);
+    console.log('- OPENAI_API_KEY exists:', !!process.env.OPENAI_API_KEY);
+    console.log('- OPENAI_API_KEY length:', process.env.OPENAI_API_KEY?.length || 0);
+    console.log('- OPENAI_API_KEY prefix:', process.env.OPENAI_API_KEY?.substring(0, 10) + '...');
+    
+    debugInfo.apiKeyExists = !!process.env.OPENAI_API_KEY;
+    debugInfo.apiKeyLength = process.env.OPENAI_API_KEY?.length || 0;
 
     try {
-      console.log(`🤖 Attempting to invoke OpenAI model`);
+      console.log('🤖 Attempting to invoke OpenAI model');
+      console.log('- Model: gpt-4o-mini');
+      console.log('- Messages count:', messages.length);
+      console.log('- Max tokens: 300');
+      console.log('- Temperature: 0.7');
+
+      // 🔍 DEBUG: Check if API key is valid format
+      if (!process.env.OPENAI_API_KEY) {
+        throw new Error('OPENAI_API_KEY environment variable is not set');
+      }
+
+      if (!process.env.OPENAI_API_KEY.startsWith('sk-')) {
+        console.warn('⚠️ API key does not start with "sk-" - might be invalid format');
+        debugInfo.keyFormatWarning = 'API key does not start with sk-';
+      }
+
       const openai = new OpenAI({
         apiKey: process.env.OPENAI_API_KEY,
       });
 
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: messages,
-        max_tokens: 300,
-        temperature: 0.7,
-      });
+      console.log('✅ OpenAI client initialized successfully');
+      debugInfo.clientInitialized = true;
 
-      if (response.choices && response.choices.length > 0 && response.choices[0].message.content) {
+      // 🔍 DEBUG: Add timeout and detailed error handling
+      const startTime = Date.now();
+      console.log('📞 Making API call to OpenAI...');
+
+      const response = await Promise.race([
+        openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: messages,
+          max_tokens: 300,
+          temperature: 0.7,
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timeout after 30 seconds')), 30000)
+        )
+      ]) as any;
+
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+      
+      console.log('📈 API call completed');
+      console.log('- Duration:', duration + 'ms');
+      console.log('- Response received:', !!response);
+      
+      debugInfo.apiCallDuration = duration;
+      debugInfo.responseReceived = !!response;
+
+      // 🔍 DEBUG: Detailed response inspection
+      console.log('🔍 Response analysis:');
+      console.log('- Response object exists:', !!response);
+      console.log('- Has choices:', !!response?.choices);
+      console.log('- Choices length:', response?.choices?.length || 0);
+      console.log('- First choice exists:', !!response?.choices?.[0]);
+      console.log('- Has message:', !!response?.choices?.[0]?.message);
+      console.log('- Has content:', !!response?.choices?.[0]?.message?.content);
+      console.log('- Content length:', response?.choices?.[0]?.message?.content?.length || 0);
+
+      debugInfo.responseAnalysis = {
+        hasChoices: !!response?.choices,
+        choicesLength: response?.choices?.length || 0,
+        hasFirstChoice: !!response?.choices?.[0],
+        hasMessage: !!response?.choices?.[0]?.message,
+        hasContent: !!response?.choices?.[0]?.message?.content,
+        contentLength: response?.choices?.[0]?.message?.content?.length || 0
+      };
+
+      if (response?.usage) {
+        console.log('💰 Token usage:');
+        console.log('- Prompt tokens:', response.usage.prompt_tokens);
+        console.log('- Completion tokens:', response.usage.completion_tokens);
+        console.log('- Total tokens:', response.usage.total_tokens);
+        debugInfo.tokenUsage = response.usage;
+      }
+
+      // Log the full response structure (be careful in production)
+      console.log('📋 Full response structure:', JSON.stringify(response, null, 2));
+
+      if (response.choices && response.choices.length > 0 && response.choices[0].message?.content) {
         aiResponse = response.choices[0].message.content;
         modelUsed = 'gpt-4o-mini';
         success = true;
-        console.log(`✅ Successfully invoked OpenAI model: ${modelUsed}`);
+        console.log('✅ Successfully invoked OpenAI model:', modelUsed);
+        console.log('📝 Response preview:', aiResponse.substring(0, 100) + '...');
+        debugInfo.success = true;
+        debugInfo.responsePreview = aiResponse.substring(0, 100);
+      } else {
+        console.error('❌ Invalid response structure from OpenAI');
+        console.error('Expected: response.choices[0].message.content');
+        console.error('Got:', {
+          choices: response?.choices,
+          firstChoice: response?.choices?.[0],
+          message: response?.choices?.[0]?.message,
+          content: response?.choices?.[0]?.message?.content
+        });
+        debugInfo.invalidResponseStructure = true;
+        throw new Error('Invalid response structure from OpenAI API');
       }
+      
     } catch (error: any) {
-      console.error(`❌ OpenAI model failed:`, error.message);
+      console.error('❌ OpenAI model failed with detailed error:');
+      console.error('- Error type:', error.constructor.name);
+      console.error('- Error message:', error.message);
+      console.error('- Error code:', error.code);
+      console.error('- Error status:', error.status);
+      console.error('- Full error:', error);
+      
+      debugInfo.error = {
+        type: error.constructor.name,
+        message: error.message,
+        code: error.code,
+        status: error.status,
+        stack: error.stack
+      };
+
+      // 🔍 DEBUG: Specific error type analysis
+      if (error.message?.includes('API key')) {
+        console.error('🔑 API Key related error detected');
+        debugInfo.apiKeyError = true;
+      }
+      
+      if (error.message?.includes('quota') || error.message?.includes('billing')) {
+        console.error('💳 Billing/Quota error detected');
+        debugInfo.billingError = true;
+      }
+      
+      if (error.message?.includes('rate limit')) {
+        console.error('⏱️ Rate limit error detected');
+        debugInfo.rateLimitError = true;
+      }
+      
+      if (error.message?.includes('timeout') || error.code === 'ECONNRESET') {
+        console.error('🕐 Network/Timeout error detected');
+        debugInfo.networkError = true;
+      }
     }
 
     if (!success) {
       aiResponse = getFallbackResponse(message);
       modelUsed = 'fallback';
-      console.log(`⚠️ OpenAI failed. Using fallback response.`);
+      console.log('⚠️ OpenAI failed. Using fallback response.');
+      console.log('📝 Fallback response preview:', aiResponse.substring(0, 100) + '...');
+      debugInfo.usedFallback = true;
+      debugInfo.fallbackReason = 'OpenAI API call failed';
     }
 
+    // 🔍 DEBUG: Include debug info in response for troubleshooting
     return NextResponse.json({
       response: aiResponse.trim(),
       model: modelUsed,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      debug: debugInfo // Remove this in production
     });
 
   } catch (error: any) {
-    console.error('❌ Chatbox API error:', error);
+    console.error('❌ Chatbox API error with full details:');
+    console.error('- Error type:', error.constructor.name);
+    console.error('- Error message:', error.message);
+    console.error('- Error stack:', error.stack);
+    console.error('- Full error object:', error);
+    
     return NextResponse.json(
       { 
         error: 'Failed to process chat message',
-        details: error.message 
+        details: error.message,
+        errorType: error.constructor.name,
+        timestamp: new Date().toISOString()
       },
       { status: 500 }
     );
