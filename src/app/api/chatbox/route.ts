@@ -1,15 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
-
-function getBedrockClient() {
-  return new BedrockRuntimeClient({
-    region: process.env.AWS_REGION || "us-east-1",
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
-    },
-  });
-}
+import OpenAI from 'openai';
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,11 +11,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    // Build conversation context
-    const conversationContext = conversationHistory
-      .map((msg: any) => `${msg.role}: ${msg.content}`)
-      .join('\n');
 
     const systemPrompt = `You are an AI study assistant for EduAI, an educational platform that helps students with learning and content creation. You are knowledgeable about a wide range of academic subjects and study techniques.
 
@@ -74,74 +59,37 @@ Keep responses helpful and detailed but not overwhelming (typically 2-4 sentence
       }
     ];
 
-    const userPrompt = conversationContext
-      ? `Previous conversation:\n${conversationContext}\n\nUser: ${message}`
-      : `User: ${message}`;
-
-    const payload = {
-      anthropic_version: "bedrock-2023-05-31",
-      max_tokens: 300,
-      temperature: 0.7,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `${systemPrompt}\n\n${userPrompt}`
-            }
-          ]
-        }
-      ]
-    };
-
-    const modelIds = [
-      "anthropic.claude-3-sonnet-20240229-v1:0",
-      "anthropic.claude-3-haiku-20240307-v1:0",
-      "anthropic.claude-3-opus-20240229-v1:0",
-      "anthropic.claude-v2:1",
-      "anthropic.claude-v2",
-    ];
-
     let aiResponse = '';
     let modelUsed = '';
     let success = false;
 
-    for (const modelId of modelIds) {
-      try {
-        console.log(`🤖 Attempting to invoke Bedrock model: ${modelId}`);
-        const client = getBedrockClient();
-        const command = new InvokeModelCommand({
-          contentType: "application/json",
-          body: JSON.stringify(payload),
-          modelId: modelId,
-          accept: "application/json",
-        });
+    try {
+      console.log(`🤖 Attempting to invoke OpenAI model`);
+      const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      });
 
-        const apiResponse = await client.send(command);
-        const decodedResponseBody = new TextDecoder().decode(apiResponse.body);
-        const responseBody = JSON.parse(decodedResponseBody);
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: messages,
+        max_tokens: 300,
+        temperature: 0.7,
+      });
 
-        if (responseBody.content && responseBody.content.length > 0 && responseBody.content[0].text) {
-          aiResponse = responseBody.content[0].text;
-          modelUsed = modelId;
-          success = true;
-          console.log(`✅ Successfully invoked Bedrock model: ${modelId}`);
-          break;
-        }
-      } catch (error: any) {
-        console.error(`❌ Bedrock model ${modelId} failed:`, error.message);
-        if (error.name === 'AccessDeniedException' || error.message.includes('not subscribed')) {
-          console.error(`AWS Bedrock access denied or model not subscribed for ${modelId}. Please check AWS permissions and model subscriptions.`);
-          // Don't break, try next model
-        }
+      if (response.choices && response.choices.length > 0 && response.choices[0].message.content) {
+        aiResponse = response.choices[0].message.content;
+        modelUsed = 'gpt-4o-mini';
+        success = true;
+        console.log(`✅ Successfully invoked OpenAI model: ${modelUsed}`);
       }
+    } catch (error: any) {
+      console.error(`❌ OpenAI model failed:`, error.message);
     }
 
     if (!success) {
       aiResponse = getFallbackResponse(message);
       modelUsed = 'fallback';
-      console.log(`⚠️ All Bedrock models failed. Using fallback response.`);
+      console.log(`⚠️ OpenAI failed. Using fallback response.`);
     }
 
     return NextResponse.json({
