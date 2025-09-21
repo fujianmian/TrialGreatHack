@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package*.json ./
 COPY package.json package-lock.json ./
 COPY patches ./patches
-RUN npm ci
+RUN npm install
 COPY . .
 RUN npm run build
 
@@ -27,4 +27,3 @@ EXPOSE 3000
 
 # Start Next.js in production mode
 CMD ["npx", "next", "start", "-p", "3000", "-H", "0.0.0.0"]
-
