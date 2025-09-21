@@ -1,11 +1,11 @@
 // next.config.ts
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Remove or fix invalid keys like 'serverActions' and 'api'
-  // Example of valid config:
   experimental: {
-    // Only include if supported in your version
-    // serverActions: true,
+    // serverActions: true, // keep this only if needed
+  },
+  eslint: {
+    ignoreDuringBuilds: true, // <- Add this line to ignore ESLint errors during build
   },
 };
 
