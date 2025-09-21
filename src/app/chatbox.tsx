@@ -39,7 +39,7 @@ export default function ChatBox({ onClose }: ChatBoxProps) {
         }));
 
       // Call OpenAI API directly
-      const response = await fetch('/api/video-openai', {
+      const response = await fetch('/api/chatbox', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
