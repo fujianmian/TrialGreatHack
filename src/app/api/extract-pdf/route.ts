@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-// @ts-ignore 
+// @ts-expect-error
 import pdfParse from 'pdf-parse';
 import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import { createBedrockClient } from '@/lib/bedrock';

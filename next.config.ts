@@ -1,14 +1,12 @@
+// next.config.ts
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  
-  serverActions: {
-    bodySizeLimit: '10mb', // For Server Actions
-  },
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb', // For API routes like /api/extract
-    },
+  // Remove or fix invalid keys like 'serverActions' and 'api'
+  // Example of valid config:
+  experimental: {
+    // Only include if supported in your version
+    // serverActions: true,
   },
 };
 
-module.exports = nextConfig;
+export default nextConfig;
