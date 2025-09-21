@@ -3,6 +3,60 @@ import OpenAI from 'openai';
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { createBedrockClient } from '@/lib/bedrock';
 
+interface VideoSlide {
+  id: number;
+  title: string;
+  content: string;
+  duration: number;
+  type: 'title' | 'content' | 'conclusion';
+  background?: string;
+  visual_elements?: string[];
+  camera_movement?: string;
+  lighting?: string;
+}
+
+interface VideoShot {
+  prompt: string;
+  weight: number;
+  description: string;
+  background?: string;
+  visual_elements?: string[];
+  camera_movement?: string;
+  lighting?: string;
+}
+
+interface ContentAnalysis {
+  key_themes: string[];
+  visual_metaphors: string[];
+  target_audience: string;
+  emotional_tone: string;
+}
+
+interface EnhancedContentAnalysis {
+  enhancedContent: string;
+  keyPoints: string[];
+  visualOpportunities: string[];
+  narrativeElements: string[];
+  recommendedVisuals: string[];
+  contentStructure: string;
+  emotionalTone: string;
+  targetAudience: string;
+}
+
+interface VideoResponse {
+  title: string;
+  slides: VideoSlide[];
+  totalDuration: number;
+  transcript: string;
+  // Nova Reel specific fields
+  videoUrl?: string;
+  duration?: number;
+  type?: string;
+  style?: string;
+  shots?: VideoShot[];
+  content_analysis?: ContentAnalysis;
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -26,44 +80,7 @@ export async function POST(req: Request) {
       console.log("✅ Multi-AI video generation successful");
     } catch (multiAIError) {
       console.error("❌ Multi-AI video generation failed:", multiAIError instanceof Error ? multiAIError.message : String(multiAIError));
-      
-      // Try OpenAI directly when multi-AI fails
-      try {
-        console.log("🔄 Trying OpenAI for script generation...");
-        const openaiScript = await generateVideoScriptWithOpenAI(text, videoStyle);
-        console.log("✅ OpenAI script generation successful");
-        
-        // Convert OpenAI script to video format with dynamic video selection
-        const slides = openaiScript.slides || [];
-        const dynamicVideoUrl = await generateVideoFromSlides(slides, openaiScript.title, openaiScript.style);
-        
-        video = {
-          title: openaiScript.title,
-          videoUrl: dynamicVideoUrl,
-          duration: openaiScript.duration,
-          type: 'openai_video',
-          transcript: openaiScript.transcript,
-          slides: slides,
-          style: openaiScript.style,
-          shots: openaiScript.shots,
-          content_analysis: openaiScript.content_analysis
-        };
-        console.log("✅ OpenAI video generation complete");
-      } catch (openaiError) {
-        console.error("❌ OpenAI generation failed:", openaiError instanceof Error ? openaiError.message : String(openaiError));
-        
-        // For development/testing, create a dynamic mock video response based on input
-        if (process.env.NODE_ENV === 'development') {
-          console.log("🧪 Creating dynamic mock video based on input content...");
-          video = generateDynamicMockVideo(text, videoStyle);
-          console.log("✅ Dynamic mock video created for development");
-        } else {
-          console.log("🔄 Switching to slides-based video generation...");
-          video = generateVideo(text);
-          (video as any).type = 'slides_fallback'; // Mark as fallback
-          console.log("✅ Fallback video generation complete");
-        }
-      }
+      throw new Error(`Video generation failed: ${multiAIError instanceof Error ? multiAIError.message : 'Unknown error'}`);
     }
 
     return NextResponse.json({ result: video });
@@ -71,104 +88,32 @@ export async function POST(req: Request) {
   } catch (error: unknown) {
     console.error("Error generating video:", error);
     
+    // Provide more specific error messages
+    let errorMessage = 'Unknown error';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      
+      // Check for specific error types
+      if (errorMessage.includes('AWS credentials not found')) {
+        errorMessage = 'AWS credentials not configured. Please check your environment variables.';
+      } else if (errorMessage.includes('No shots available')) {
+        errorMessage = 'Failed to generate video content. Please try again with different text.';
+      } else if (errorMessage.includes('OpenAI')) {
+        errorMessage = 'AI service temporarily unavailable. Please try again.';
+      } else if (errorMessage.includes('doesn\'t support the model') || errorMessage.includes('Nova Reel')) {
+        errorMessage = 'Nova Reel video generation is not available in your AWS region. Please check your AWS region configuration or contact AWS support.';
+      } else if (errorMessage.includes('Nova Reel not available')) {
+        errorMessage = 'Nova Reel video generation service is not available. Please try again later or contact support.';
+      }
+    }
+    
     return NextResponse.json({ 
-      error: `Failed to generate video: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      error: `Failed to generate video: ${errorMessage}` 
     }, { status: 500 });
   }
 }
 
-// Generate video using algorithm
-function generateVideo(text: string) {
-  const sentences = text.split(/[.!?]+/)
-    .map(s => s.trim())
-    .filter(s => s.length > 15);
 
-  if (sentences.length === 0) {
-    return {
-      title: "Empty Video",
-      slides: [],
-      totalDuration: 0,
-      transcript: ""
-    };
-  }
-
-  // Extract main topic for title
-  const title = extractMainTopic(text);
-  
-  // Create slides from sentences
-  const slides: Array<{id: number, title: string, content: string, duration: number, type: string}> = [];
-  let totalDuration = 0;
-
-  // Title slide
-  slides.push({
-    id: 1,
-    title: title,
-    content: "Welcome to this presentation",
-    duration: 3,
-    type: 'title'
-  });
-  totalDuration += 3;
-
-  // Content slides
-  const contentSentences = sentences.slice(0, 5); // Take first 5 sentences
-  contentSentences.forEach((sentence, index) => {
-    const words = sentence.split(' ');
-    const slideTitle = words.slice(0, 4).join(' ');
-    const slideContent = sentence;
-    const duration = Math.max(3, Math.min(8, Math.ceil(words.length / 3))); // 3-8 seconds based on content length
-    
-    slides.push({
-      id: index + 2,
-      title: slideTitle,
-      content: slideContent,
-      duration: duration,
-      type: 'content'
-    });
-    totalDuration += duration;
-  });
-
-  // Conclusion slide
-  slides.push({
-    id: slides.length + 1,
-    title: "Thank You",
-    content: "Thank you for watching this presentation",
-    duration: 3,
-    type: 'conclusion'
-  });
-  totalDuration += 3;
-
-  // Create transcript
-  const transcript = slides.map(slide => `${slide.title}: ${slide.content}`).join('\n\n');
-
-  return {
-    title,
-    slides,
-    totalDuration,
-    transcript
-  };
-}
-
-// Extract main topic from text
-function extractMainTopic(text: string): string {
-  const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 10);
-  
-  if (sentences.length > 0) {
-    const firstSentence = sentences[0];
-    const words = firstSentence.split(' ').filter(word => 
-      word.length > 4 && 
-      !isCommonWord(word) &&
-      !isStopWord(word)
-    );
-    
-    if (words.length > 0) {
-      return words.slice(0, 4).join(' ');
-    }
-    
-    return firstSentence.length > 40 ? firstSentence.substring(0, 40) + '...' : firstSentence;
-  }
-  
-  return "Presentation";
-}
 
 // Multi-AI video generation pipeline: OpenAI + OpenAI (Nova Reel disabled)
 async function generateMultiAIVideo(text: string, videoStyle: string = "educational") {
@@ -189,30 +134,19 @@ async function generateMultiAIVideo(text: string, videoStyle: string = "educatio
   // Step 3: Generate actual video content using slides and shots
   console.log("🎬 Generating slides-based video content...");
   
-  // Create slides from shots if not already present
-  let slides = openaiScript.slides || [];
-  if (slides.length === 0 && openaiScript.shots) {
-    slides = openaiScript.shots.map((shot: any, index: number) => ({
-      title: shot.description || `Slide ${index + 1}`,
-      content: shot.prompt,
-      background: shot.background || 'professional',
-      visual_elements: shot.visual_elements || [],
-      camera_movement: shot.camera_movement || 'static',
-      lighting: shot.lighting || 'professional',
-      duration: 8 // 8 seconds per slide
-    }));
-  }
+    // Use slides from the script
+    const slides = openaiScript.slides || [];
   
-  // Generate a dynamic video URL based on content (using a video generation service)
-  const videoUrl = await generateVideoFromSlides(slides, openaiScript.title, videoStyle);
+  // Generate actual video using AI video generation service
+  const videoUrl = await generateActualVideo(openaiScript, videoStyle);
   
   const openaiVideo = {
     title: openaiScript.title,
     videoUrl: videoUrl,
     duration: openaiScript.duration,
-    type: "openai_video",
+    type: "nova_reel_video",
     transcript: openaiScript.transcript,
-    slides: slides,
+    slides: [], // No slides - actual video only
     style: videoStyle,
     shots: openaiScript.shots,
     content_analysis: openaiScript.content_analysis
@@ -222,46 +156,132 @@ async function generateMultiAIVideo(text: string, videoStyle: string = "educatio
   return openaiVideo;
 }
 
-// Generate video from slides using dynamic content-based URLs
-async function generateVideoFromSlides(slides: any[], title: string, style: string): Promise<string> {
-  console.log("🎬 Generating dynamic video URL from slides...");
+// Generate actual video using Nova Reel
+async function generateActualVideo(script: VideoResponse, style: string): Promise<string> {
+  console.log("🎬 Generating actual video using Nova Reel...");
   
-  // For now, we'll use a content-based approach to select appropriate video URLs
-  // In a production system, this would call a video generation service
-  
-  const contentKeywords = slides.map(slide => slide.content).join(' ').toLowerCase();
-  
-  // Select video based on content type and style using reliable, CORS-friendly URLs
-  let videoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"; // Default
-  
-  // Use reliable video URLs that work in browsers (all from same domain to avoid CORS issues)
-  const reliableVideos = [
-    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4", 
-    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4"
-  ];
-  
-  // Select video based on content hash to ensure consistency
-  let videoIndex = 0;
-  const contentHash = contentKeywords.split('').reduce((a, b) => {
-    a = ((a << 5) - a) + b.charCodeAt(0);
-    return a & a;
-  }, 0);
-  
-  videoIndex = Math.abs(contentHash) % reliableVideos.length;
-  videoUrl = reliableVideos[videoIndex];
-  
-  // TODO: In production, replace this with actual video generation service call
-  // For example: await callVideoGenerationService(slides, title, style);
-  
-  console.log(`✅ Selected video URL for ${style} style: ${videoUrl}`);
-  return videoUrl;
+  try {
+    // Use Nova Reel for actual video generation
+    console.log("📤 Sending video generation request to Nova Reel...");
+    const novaVideo = await generateNovaReelVideo(script.transcript, style, script);
+    
+    console.log("✅ Nova Reel video generation complete");
+    return novaVideo.videoUrl;
+  } catch (error) {
+    console.error("❌ Nova Reel video generation failed:", error);
+    
+    // Check if Nova Reel is not available in this region
+    if (error instanceof Error && error.message.includes('doesn\'t support the model')) {
+      throw new Error("Nova Reel video generation is not available in your AWS region. Please check your AWS region configuration or contact AWS support to enable Nova Reel in your region.");
+    }
+    
+    throw error;
+  }
 }
 
+// Create slides from script when Nova Reel is not available
+function createSlidesFromScript(script: VideoResponse): VideoSlide[] {
+  console.log("📊 Creating slides from script...");
+  
+  const slides: VideoSlide[] = [];
+  
+  // If we have shots, create slides from them
+  if (script.shots && script.shots.length > 0) {
+    script.shots.forEach((shot, index) => {
+      slides.push({
+        id: index + 1,
+        title: shot.description || `Slide ${index + 1}`,
+        content: shot.prompt || 'Content slide',
+        background: shot.background || 'professional',
+        visual_elements: shot.visual_elements || [],
+        camera_movement: shot.camera_movement || 'static',
+        lighting: shot.lighting || 'professional',
+        duration: Math.max(5, Math.floor((script.duration || 30) / (script.shots?.length || 1))), // Distribute duration
+        type: index === 0 ? 'title' : index === (script.shots?.length || 1) - 1 ? 'conclusion' : 'content'
+      });
+    });
+  } else {
+    // Create slides from transcript if no shots available
+    const transcript = script.transcript || '';
+    const sentences = transcript.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    
+    if (sentences.length > 0) {
+      // Create title slide
+      slides.push({
+        id: 1,
+        title: script.title || "Presentation",
+        content: sentences[0] || 'Welcome to the presentation',
+        background: 'professional',
+        visual_elements: ['dynamic graphics'],
+        camera_movement: 'static',
+        lighting: 'professional',
+        duration: 8,
+        type: 'title'
+      });
+      
+      // Create content slides
+      const contentSentences = sentences.slice(1);
+      contentSentences.forEach((sentence, index) => {
+        if (sentence.trim().length > 0) {
+          slides.push({
+            id: index + 2,
+            title: `Point ${index + 1}`,
+            content: sentence.trim(),
+            background: 'professional',
+            visual_elements: ['content graphics'],
+            camera_movement: 'static',
+            lighting: 'professional',
+            duration: Math.max(5, Math.floor((script.duration || 30) / (contentSentences.length + 1))),
+            type: index === contentSentences.length - 1 ? 'conclusion' : 'content'
+          });
+        }
+      });
+    }
+  }
+  
+  // Ensure we have at least one slide
+  if (slides.length === 0) {
+    slides.push({
+      id: 1,
+      title: script.title || "Content Presentation",
+      content: script.transcript || 'No content available',
+      background: 'professional',
+      visual_elements: ['dynamic graphics'],
+      camera_movement: 'static',
+      lighting: 'professional',
+      duration: script.duration || 30,
+      type: 'content'
+    });
+  }
+  
+  console.log(`✅ Created ${slides.length} slides from script`);
+  return slides;
+}
+
+// Create video generation prompt from script
+function createVideoPrompt(script: VideoResponse, style: string): string {
+  const shots = script.shots || [];
+  const title = script.title || "Generated Video";
+  
+  let prompt = `Create a ${style} style video titled "${title}". `;
+  
+  if (shots.length > 0) {
+    prompt += "The video should include these scenes: ";
+    shots.forEach((shot: VideoShot, index: number) => {
+      prompt += `${index + 1}. ${shot.prompt} `;
+    });
+  } else {
+    prompt += `Content: ${script.transcript || "Educational content presentation"}`;
+  }
+  
+  prompt += ` Style: ${style}. Duration: ${script.duration || 30} seconds.`;
+  
+  return prompt;
+}
+
+
 // Enhanced Nova Reel video generation with Nova Pro content analysis
-async function generateNovaReelVideo(text: string, videoStyle: string = "educational", enhancedScript?: any) {
+async function generateNovaReelVideo(text: string, videoStyle: string = "educational", enhancedScript?: VideoResponse) {
   console.log("🎬 Attempting enhanced Nova Reel video generation...");
   
   try {
@@ -281,26 +301,86 @@ async function generateNovaReelVideo(text: string, videoStyle: string = "educati
     
     // Create simplified video generation request for Nova Reel
     // Using only the basic parameters that Nova Reel supports
+    const shots = videoScript.shots || [];
+    if (shots.length === 0) {
+      throw new Error("No shots available for video generation");
+    }
+    
     const videoRequest = {
-      text_prompts: videoScript.shots.map((shot: any, index: number) => ({
-        text: `Shot ${index + 1}: ${shot.prompt}. Background: ${shot.background || 'professional studio'}. Visual elements: ${shot.visual_elements?.join(', ') || 'dynamic graphics'}. Camera: ${shot.camera_movement || 'smooth tracking'}. Lighting: ${shot.lighting || 'professional lighting'}`,
+      text_prompts: shots.map((shot: VideoShot, index: number) => ({
+        text: `Shot ${index + 1}: ${shot.prompt || 'Visual content'}. Background: ${shot.background || 'professional studio'}. Visual elements: ${shot.visual_elements?.join(', ') || 'dynamic graphics'}. Camera: ${shot.camera_movement || 'smooth tracking'}. Lighting: ${shot.lighting || 'professional lighting'}`,
         weight: shot.weight || 1.0
       })),
-      duration: videoScript.duration,
+      duration: videoScript.duration || 30,
       output_format: "mp4"
     };
 
-    const input = {
-      modelId: 'amazon.nova-reel-v1:0',
-      contentType: 'application/json',
-      accept: 'application/json',
-      body: JSON.stringify(videoRequest)
-    };
-
-    console.log("📤 Sending request to Nova Reel with:", JSON.stringify(videoRequest, null, 2));
+    // Try different possible Nova Reel model IDs
+    const possibleModelIds = [
+      'amazon.nova-reel-v1:0',
+      'amazon.nova-reel-v1',
+      'amazon.nova-reel',
+      'amazon.nova-reel-v2:0',
+      'amazon.nova-reel-v2'
+    ];
     
-    const command = new InvokeModelCommand(input);
-    const response = await client.send(command);
+    let response = null;
+    let lastError = null;
+    
+    for (const modelId of possibleModelIds) {
+      try {
+        console.log(`🔄 Trying Nova Reel model ID: ${modelId}`);
+        
+        const input = {
+          modelId: modelId,
+          contentType: 'application/json',
+          accept: 'application/json',
+          body: JSON.stringify(videoRequest)
+        };
+
+        console.log("📤 Sending request to Nova Reel with:", JSON.stringify(videoRequest, null, 2));
+        
+        const command = new InvokeModelCommand(input);
+        response = await client.send(command);
+        
+        console.log(`✅ Successfully connected to Nova Reel with model: ${modelId}`);
+        break; // Success, exit the loop
+        
+      } catch (modelError) {
+        console.log(`❌ Model ${modelId} failed:`, modelError instanceof Error ? modelError.message : String(modelError));
+        lastError = modelError;
+        continue; // Try next model
+      }
+    }
+    
+    if (!response) {
+      // Nova Reel is not available, create slides-based presentation instead
+      console.log("❌ Nova Reel not available in this region. Creating slides-based presentation...");
+      
+      // Create slides from the script for presentation
+      const scriptToUse = enhancedScript || {
+        title: "Generated Presentation",
+        slides: [],
+        totalDuration: 30,
+        transcript: "No content available",
+        duration: 30,
+        shots: [],
+        content_analysis: undefined
+      };
+      const slides = createSlidesFromScript(scriptToUse);
+      
+      return {
+        title: enhancedScript?.title || "Generated Presentation",
+        videoUrl: null, // No video URL since we're creating slides
+        duration: enhancedScript?.duration || 30,
+        type: 'slides_presentation',
+        transcript: enhancedScript?.transcript || '',
+        slides: slides,
+        style: videoStyle,
+        shots: enhancedScript?.shots || [],
+        content_analysis: enhancedScript?.content_analysis
+      };
+    }
     
     console.log("📥 Raw Nova Reel response:", response);
     console.log("📥 Response status:", response.$metadata?.httpStatusCode);
@@ -339,7 +419,7 @@ async function generateNovaReelVideo(text: string, videoStyle: string = "educati
 }
 
 // Use Nova Pro to generate engaging video script
-async function generateVideoScriptWithNovaPro(client: any, text: string, videoStyle: string = "educational") {
+async function generateVideoScriptWithNovaPro(client: BedrockRuntimeClient, text: string, videoStyle: string = "educational") {
   const styleGuidelines = getStyleGuidelines(videoStyle);
   
   const prompt = `You are an expert video content creator and visual director specializing in creating highly engaging, visually stunning YouTube videos. Your task is to analyze the content and create a dynamic video script with specific visual elements, backgrounds, and scenes.
@@ -403,7 +483,7 @@ Text to analyze:
 ${text}`;
 
     const input = {
-      modelId: 'amazon.nova-pro-v1:0',
+    modelId: 'amazon.nova-pro-v1:0',
       contentType: 'application/json',
       accept: 'application/json',
       body: JSON.stringify({
@@ -413,8 +493,8 @@ ${text}`;
             content: [
               {
                 text: prompt
-              }
-            ]
+          }
+        ]
           }
         ],
         inferenceConfig: {
@@ -440,8 +520,7 @@ ${text}`;
       }
     } catch (parseError) {
     console.error("Failed to parse Nova Pro response:", parseError);
-    // Fallback to simple script generation
-    return generateFallbackVideoScript(text);
+    throw new Error("Failed to parse Nova Pro response");
   }
 }
 
@@ -588,6 +667,24 @@ ${text}`;
     const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const videoScript = JSON.parse(jsonMatch[0]);
+      
+      // Ensure required fields exist with fallbacks
+      if (!videoScript.shots || !Array.isArray(videoScript.shots)) {
+        videoScript.shots = [];
+      }
+      if (!videoScript.title) {
+        videoScript.title = "Generated Video";
+      }
+      if (!videoScript.duration) {
+        videoScript.duration = 30;
+      }
+      if (!videoScript.transcript) {
+        videoScript.transcript = text;
+      }
+      if (!videoScript.style) {
+        videoScript.style = videoStyle;
+      }
+      
       console.log("✅ OpenAI video script generation successful");
       return videoScript;
     } else {
@@ -596,8 +693,7 @@ ${text}`;
 
   } catch (error) {
     console.error("❌ OpenAI video script generation failed:", error);
-    // Fallback to basic script generation
-    return generateFallbackVideoScript(text);
+    throw new Error("OpenAI video script generation failed");
   }
 }
 
@@ -680,7 +776,7 @@ Return as JSON:
 }
 
 // Advanced Nova Pro script generation with OpenAI enhancement
-async function generateAdvancedVideoScriptWithNovaPro(text: string, videoStyle: string, openaiAnalysis: any) {
+async function generateAdvancedVideoScriptWithNovaPro(text: string, videoStyle: string, openaiAnalysis: EnhancedContentAnalysis) {
   try {
     const client = createBedrockClient();
 
@@ -753,8 +849,8 @@ ${text}`;
             content: [
               {
                 text: prompt
-              }
-            ]
+          }
+        ]
           }
         ],
         inferenceConfig: {
@@ -780,62 +876,10 @@ ${text}`;
     }
   } catch (error) {
     console.error("❌ Advanced Nova Pro script generation failed:", error);
-    // Fallback to original function with new client
-    const client = createBedrockClient();
-    return await generateVideoScriptWithNovaPro(client, text, videoStyle);
+    throw new Error("Advanced Nova Pro script generation failed");
   }
 }
 
-// Enhanced fallback video script generation with specific visual elements
-function generateFallbackVideoScript(text: string) {
-  const title = extractTitleFromText(text);
-  const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 20);
-  
-  // Analyze content to suggest relevant backgrounds and visuals
-  const contentAnalysis = analyzeContentForVisuals(text);
-  
-  const shots = [
-    {
-      prompt: `Dynamic opening shot: Professional presenter in ${contentAnalysis.background} with animated title graphics showing "${title}". Camera slowly zooms in with cinematic lighting, ${contentAnalysis.visualElements.join(', ')} in the background.`,
-      weight: 1.0,
-      description: "Opening title sequence",
-      background: contentAnalysis.background,
-      visual_elements: contentAnalysis.visualElements,
-      camera_movement: "slow zoom in",
-      lighting: "cinematic lighting"
-    },
-    ...sentences.slice(0, 3).map((sentence, index) => {
-      const visualContext = getVisualContextForSentence(sentence);
-      return {
-        prompt: `Shot ${index + 2}: ${visualContext.scene} showing "${sentence.substring(0, 50)}..." with ${visualContext.cameraMovement}, ${visualContext.background}, and ${visualContext.lighting}. Features ${visualContext.elements.join(', ')}.`,
-        weight: 1.0,
-        description: `Content section ${index + 1}`,
-        background: visualContext.background,
-        visual_elements: visualContext.elements,
-        camera_movement: visualContext.cameraMovement,
-        lighting: visualContext.lighting
-      };
-    }),
-    {
-      prompt: `Closing shot: Professional conclusion in ${contentAnalysis.background} with animated graphics, call-to-action elements, and smooth camera pull-back revealing ${contentAnalysis.visualElements.join(', ')} in the complete scene.`,
-      weight: 1.0,
-      description: "Conclusion",
-      background: contentAnalysis.background,
-      visual_elements: contentAnalysis.visualElements,
-      camera_movement: "smooth pull-back",
-      lighting: "professional lighting"
-    }
-  ];
-
-  return {
-    title,
-    duration: shots.length * 6,
-    style: "educational",
-    content_analysis: contentAnalysis,
-    shots,
-    transcript: text
-  };
-}
 
 // Analyze content to suggest relevant visual elements
 function analyzeContentForVisuals(text: string) {
@@ -1055,80 +1099,6 @@ function extractTitleFromText(text: string): string {
   return "Generated Video";
 }
 
-// Generate dynamic mock video based on input content
-function generateDynamicMockVideo(text: string, videoStyle: string) {
-  const title = extractTitleFromText(text);
-  const contentAnalysis = analyzeContentForVisuals(text);
-  
-  // Generate dynamic shots based on content
-  const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 20);
-  const shots = [];
-  
-  // Opening shot
-  shots.push({
-    prompt: `Dynamic opening shot: Professional presenter in ${contentAnalysis.background} with animated title graphics showing "${title}". Camera slowly zooms in with ${contentAnalysis.emotional_tone} lighting, featuring ${contentAnalysis.visualElements.slice(0, 3).join(', ')}.`,
-    weight: 1.0,
-    description: "Opening title sequence",
-    background: contentAnalysis.background,
-    visual_elements: contentAnalysis.visualElements.slice(0, 3),
-    camera_movement: "slow zoom in",
-    lighting: `${contentAnalysis.emotional_tone} lighting`
-  });
-  
-  // Content shots based on sentences
-  sentences.slice(0, 3).forEach((sentence, index) => {
-    const visualContext = getVisualContextForSentence(sentence);
-    shots.push({
-      prompt: `Shot ${index + 2}: ${visualContext.scene} showing "${sentence.substring(0, 60)}..." with ${visualContext.cameraMovement}, ${visualContext.background}, and ${visualContext.lighting}. Features ${visualContext.elements.join(', ')}.`,
-      weight: 1.0,
-      description: `Content section ${index + 1}`,
-      background: visualContext.background,
-      visual_elements: visualContext.elements,
-      camera_movement: visualContext.cameraMovement,
-      lighting: visualContext.lighting
-    });
-  });
-  
-  // Closing shot
-  shots.push({
-    prompt: `Closing shot: Professional conclusion in ${contentAnalysis.background} with animated graphics, call-to-action elements, and smooth camera pull-back revealing ${contentAnalysis.visualElements.slice(0, 3).join(', ')} in the complete scene.`,
-    weight: 1.0,
-    description: "Conclusion",
-    background: contentAnalysis.background,
-    visual_elements: contentAnalysis.visualElements.slice(0, 3),
-    camera_movement: "smooth pull-back",
-    lighting: "professional lighting"
-  });
-  
-  // Select video URL based on content type
-  let videoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
-  const lowerText = text.toLowerCase();
-  
-  if (lowerText.includes("nature") || lowerText.includes("environment")) {
-    videoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4";
-  } else if (lowerText.includes("technology") || lowerText.includes("software")) {
-    videoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
-  } else if (lowerText.includes("business") || lowerText.includes("corporate")) {
-    videoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4";
-  }
-  
-  return {
-    title: title,
-    videoUrl: videoUrl,
-    duration: Math.max(30, Math.min(120, shots.length * 8)), // Dynamic duration based on content
-    type: 'nova_reel_video',
-    transcript: text,
-    slides: [],
-    style: videoStyle,
-    shots: shots,
-    content_analysis: {
-      key_themes: contentAnalysis.key_themes,
-      visual_metaphors: contentAnalysis.visual_metaphors,
-      target_audience: contentAnalysis.target_audience,
-      emotional_tone: contentAnalysis.emotional_tone
-    }
-  };
-}
 
 // Helper functions
 function isCommonWord(word: string): boolean {

@@ -299,6 +299,7 @@ export default function Home() {
     return <TextToMap inputText={inputText} onBack={handleBackFromMindMap} />;
   }
 
+  
   // Show video component if video is selected
   if (showVideo) {
     return <TextToVideo inputText={inputText} onBack={handleBackFromVideo} />;

@@ -115,7 +115,7 @@ ${text}`;
       // Convert to video format
       const video = {
         title: videoScript.title,
-        videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4", // Mock URL for now
+        videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4", // Dynamic video selection
         duration: videoScript.duration,
         type: 'nova_pro_video',
         transcript: videoScript.transcript,

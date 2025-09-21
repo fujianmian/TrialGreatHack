@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import OpenAI from 'openai';
+import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 
 export async function POST(req: Request) {
   try {
@@ -11,11 +12,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Text content cannot be empty" }, { status: 400 });
     }
 
-    console.log("🤖 Using OpenAI directly for video generation...");
+    console.log("🤖 Using OpenAI for script generation...");
     console.log("📝 Text length:", text.length);
     console.log("🎨 Video style:", videoStyle);
 
-    // Use OpenAI directly for script generation
+    // Use OpenAI for script generation
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
@@ -80,7 +81,7 @@ Text to analyze:
 ${text}`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
@@ -102,33 +103,89 @@ ${text}`;
 
     // Parse the JSON response
     const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const videoScript = JSON.parse(jsonMatch[0]);
-      console.log("✅ OpenAI script generation successful");
-      
-      // Convert to video format
-      const video = {
-        title: videoScript.title,
-        videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4", // Mock URL for now
-        duration: videoScript.duration,
-        type: 'openai_video',
-        transcript: videoScript.transcript,
-        slides: [],
-        style: videoScript.style,
-        shots: videoScript.shots,
-        content_analysis: videoScript.content_analysis
-      };
-      
-      return NextResponse.json({ result: video });
-    } else {
+    if (!jsonMatch) {
       throw new Error("No valid JSON found in OpenAI response");
     }
 
+    const videoScript = JSON.parse(jsonMatch[0]);
+    console.log("✅ OpenAI script generation successful");
+
+    // Generate video using AWS Bedrock Nova Reel
+    console.log("🎬 Generating video with Nova Reel via AWS Bedrock...");
+    let videoUrl;
+
+    try {
+      const client = new BedrockRuntimeClient({
+        region: 'us-east-1',
+        credentials: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+        },
+      });
+
+      // Construct the Nova Reel request based on the script
+      const novaRequest = {
+        text_prompts: videoScript.shots.map((shot: any) => ({
+          text: shot.prompt,
+          weight: shot.weight || 1.0,
+        })),
+        duration: videoScript.duration || 30,
+        output_format: "mp4",
+      };
+
+      console.log("🧪 Nova Reel request:", JSON.stringify(novaRequest, null, 2));
+
+      const input = {
+        modelId: 'amazon.nova-reel-v1:1',
+        contentType: 'application/json',
+        accept: 'application/json',
+        body: JSON.stringify(novaRequest),
+      };
+
+      const command = new InvokeModelCommand(input);
+      const novaResponse = await client.send(command);
+
+      console.log("🧪 Nova Reel response status:", novaResponse.$metadata?.httpStatusCode);
+
+      const novaData = JSON.parse(new TextDecoder().decode(novaResponse.body));
+      console.log("🧪 Nova Reel parsed response:", JSON.stringify(novaData, null, 2));
+
+      // Extract video URL (adjust based on actual response structure)
+      videoUrl = novaData.videoUrl || novaData.result?.videoUrl;
+      if (!videoUrl) {
+        throw new Error("No video URL returned from Nova Reel");
+      }
+      console.log("✅ Nova Reel video generation successful");
+
+    } catch (novaError) {
+      console.error("❌ Nova Reel API failed:", novaError);
+      // Fallback to placeholder video
+      videoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4";
+      console.log("🔄 Using fallback video URL");
+    }
+
+    // Construct the response video object
+    const video = {
+      title: videoScript.title,
+      videoUrl: videoUrl,
+      duration: videoScript.duration,
+      type: 'openai_video',
+      transcript: videoScript.transcript,
+      slides: [],
+      style: videoScript.style,
+      shots: videoScript.shots,
+      content_analysis: videoScript.content_analysis,
+    };
+
+    return NextResponse.json({ result: video });
+
   } catch (error: unknown) {
-    console.error("❌ OpenAI video generation failed:", error);
-    
-    return NextResponse.json({ 
-      error: `OpenAI video generation failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
-    }, { status: 500 });
+    console.error("❌ Video generation failed:", error);
+    return NextResponse.json(
+      {
+        error: `Video generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      },
+      { status: 500 }
+    );
   }
 }

@@ -57,8 +57,6 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
   const [generationStep, setGenerationStep] = useState<string>('');
   const [selectedStyle, setSelectedStyle] = useState<string>('educational');
   const [videoLoadingState, setVideoLoadingState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
-  const [fallbackVideoUrls, setFallbackVideoUrls] = useState<string[]>([]);
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
 
   const generateVideo = useCallback(async () => {
     setIsGenerating(true);
@@ -67,7 +65,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
     setGenerationStep('Analyzing content with AI...');
 
     try {
-      const response = await fetch('/api/video', {
+      const response = await fetch('/api/video-openai', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -84,17 +82,6 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
       setVideo(data.result);
       setGenerationStep('');
       setVideoLoadingState('idle');
-      setCurrentVideoIndex(0);
-      
-      // Set up fallback video URLs (removed BigBuckBunny as first fallback)
-      const fallbackUrls = [
-        data.result.videoUrl,
-        "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-        "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-        "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4"
-      ].filter(url => url); // Remove any undefined URLs
-      
-      setFallbackVideoUrls(fallbackUrls);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       setGenerationStep('');
@@ -137,13 +124,9 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
     setVideoError(errorMessage);
     setVideoLoadingState('error');
     
-    // Automatically try next video URL if available
-    setTimeout(() => {
-      if (currentVideoIndex < fallbackVideoUrls.length - 1) {
-        console.log(`🔄 Video failed to load, trying fallback ${currentVideoIndex + 1}: ${fallbackVideoUrls[currentVideoIndex + 1]}`);
-        tryNextVideoUrl();
-      }
-    }, 1000);
+    // No automatic fallback - show error instead
+    console.error(`❌ Video failed to load: ${video.src}`);
+    console.error(`❌ Error details: ${errorMessage}`);
   };
 
   const handleVideoLoadStart = () => {
@@ -159,22 +142,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
     setVideoLoadingState('loaded');
   };
 
-  const tryNextVideoUrl = () => {
-    if (currentVideoIndex < fallbackVideoUrls.length - 1) {
-      const nextIndex = currentVideoIndex + 1;
-      setCurrentVideoIndex(nextIndex);
-      setVideoError(null);
-      setVideoLoadingState('idle');
-      
-      // Update the video URL in the video object
-      if (video) {
-        setVideo({
-          ...video,
-          videoUrl: fallbackVideoUrls[nextIndex]
-        });
-      }
-    }
-  };
+  // Removed tryNextVideoUrl function - no more fallback videos
 
   useEffect(() => {
     // Don't auto-generate, let user choose style first
@@ -185,10 +153,15 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (isPlaying && video) {
+    if (isPlaying && video && video.slides && video.slides.length > 0 && video.slides[currentSlide]) {
       interval = setInterval(() => {
         setProgress(prev => {
-          const newProgress = prev + 100 / (video.slides[currentSlide].duration * 10);
+          const slide = video.slides[currentSlide];
+          if (!slide || typeof slide.duration !== 'number') {
+            return prev;
+          }
+          
+          const newProgress = prev + 100 / (slide.duration * 10);
           if (newProgress >= 100) {
             if (currentSlide < video.slides.length - 1) {
               setCurrentSlide(prev => prev + 1);
@@ -206,20 +179,20 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
   }, [isPlaying, currentSlide, video]);
 
   const playPause = () => {
-    if (video && currentSlide < video.slides.length) {
+    if (video && video.slides && video.slides.length > 0 && currentSlide < video.slides.length) {
       setIsPlaying(!isPlaying);
     }
   };
 
   const nextSlide = () => {
-    if (video && currentSlide < video.slides.length - 1) {
+    if (video && video.slides && video.slides.length > 0 && currentSlide < video.slides.length - 1) {
       setCurrentSlide(currentSlide + 1);
       setProgress(0);
     }
   };
 
   const prevSlide = () => {
-    if (currentSlide > 0) {
+    if (video && video.slides && video.slides.length > 0 && currentSlide > 0) {
       setCurrentSlide(currentSlide - 1);
       setProgress(0);
     }
@@ -375,7 +348,8 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
   }
 
   // Check if we have a video (Nova Reel, OpenAI, or other video types) or slides
-  const isNovaReelVideo = (video?.type === 'nova_reel_video' || video?.type === 'openai_video') && video?.videoUrl;
+  const isNovaReelVideo = (video?.type === 'nova_reel_video' || video?.type === 'openai_video' || video?.type === 'ai_generated_video') && video?.videoUrl;
+  const isSlidesPresentation = video?.type === 'slides_presentation';
   const hasSlides = video?.slides && video.slides.length > 0;
 
   return (
@@ -385,7 +359,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
         <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-3xl font-bold text-gray-800">
-              {isNovaReelVideo ? 'AI Generated Video' : 'Video Presentation'}
+              {isNovaReelVideo ? 'AI Generated Video' : isSlidesPresentation ? 'Interactive Presentation' : 'Video Presentation'}
             </h1>
             <button
               onClick={onBack}
@@ -399,6 +373,8 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
             <h2 className="text-xl font-semibold text-gray-700 mb-2">{video?.title}</h2>
             {isNovaReelVideo ? (
               <p className="text-gray-600">Duration: {video?.duration || 30} seconds • AI Generated Video</p>
+            ) : isSlidesPresentation ? (
+              <p className="text-gray-600">Duration: {Math.round(video?.duration || 0)} seconds • {video?.slides?.length || 0} slides • Interactive Presentation</p>
             ) : (
               <p className="text-gray-600">Duration: {Math.round(video?.totalDuration || 0)} seconds • {video?.slides?.length || 0} slides</p>
             )}
@@ -419,34 +395,11 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
                       <p className="text-lg leading-relaxed mb-4">{videoError}</p>
                       
                       <div className="space-y-3">
-                        {currentVideoIndex < fallbackVideoUrls.length - 1 ? (
-                          <div className="text-sm text-gray-300 mb-4">
-                            Trying fallback video {currentVideoIndex + 2} of {fallbackVideoUrls.length}...
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-300 mb-4">
-                            All video sources failed. Please try again.
-                          </div>
-                        )}
+                        <div className="text-sm text-gray-300 mb-4">
+                          Video failed to load. Please try generating a new video.
+                        </div>
                         
                         <div className="flex gap-3 justify-center">
-                          <button
-                            onClick={() => {
-                              setVideoError(null);
-                              setVideoLoadingState('idle');
-                              setCurrentVideoIndex(0);
-                              if (video) {
-                                setVideo({
-                                  ...video,
-                                  videoUrl: fallbackVideoUrls[0]
-                                });
-                              }
-                            }}
-                            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                          >
-                            Retry Current Video
-                          </button>
-                          
                           <button
                             onClick={generateVideo}
                             className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
@@ -521,11 +474,9 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
                   <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">Debug Info</summary>
                   <div className="mt-2 p-3 bg-gray-100 rounded text-xs text-gray-600 space-y-1">
                     <div><strong>Current Video URL:</strong> {video.videoUrl}</div>
-                    <div><strong>Video Index:</strong> {currentVideoIndex + 1} of {fallbackVideoUrls.length}</div>
                     <div><strong>Video Type:</strong> {video.type}</div>
                     <div><strong>Loading State:</strong> {videoLoadingState}</div>
                     <div><strong>Browser Support:</strong> {document.createElement('video').canPlayType('video/mp4') ? 'MP4 Supported' : 'MP4 Not Supported'}</div>
-                    <div><strong>Fallback URLs:</strong> {fallbackVideoUrls.length} available</div>
                   </div>
                 </details>
                 
