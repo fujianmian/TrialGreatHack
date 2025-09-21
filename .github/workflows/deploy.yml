@@ -43,7 +43,7 @@ jobs:
             NEW_IMAGE="268060978153.dkr.ecr.ap-southeast-5.amazonaws.com/greataihack1:${{ github.sha }}"
             jq --arg IMAGE "$NEW_IMAGE" '
               del(.tags, .pidMode, .ipcMode, .proxyConfiguration, .inferenceAccelerators, .ephemeralStorage) |
-              .containerDefinitions[0].image=$IMAGE
+              .containerDefinitions[0].image=$IMAGE |
               .cpu="32768" | 
               .memory="65536"
             ' taskdef.json > new-taskdef.json
