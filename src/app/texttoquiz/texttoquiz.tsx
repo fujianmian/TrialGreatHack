@@ -244,11 +244,11 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="max-w-md mx-auto text-center">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 rounded-full mb-6">
-            <i className="fas fa-exclamation-triangle text-3xl text-red-600"></i>
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-red-900/30 border border-red-500/30 rounded-full mb-6">
+            <i className="fas fa-exclamation-triangle text-3xl text-red-400"></i>
           </div>
           <h2 className="text-2xl font-bold text-white mb-4">Error Generating Quiz</h2>
-          <p className="text-white mb-6">{error}</p>
+          <p className="text-gray-300 mb-6">{error}</p>
           <div className="space-y-3">
             <button
               onClick={generateQuiz}
@@ -258,7 +258,7 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
             </button>
             <button
               onClick={onBack}
-              className="w-full px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              className="w-full px-6 py-3 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors"
             >
               Go Back
             </button>
@@ -272,11 +272,11 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="max-w-md mx-auto text-center">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-100 rounded-full mb-6">
-            <i className="fas fa-question-circle text-3xl text-gray-600"></i>
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-700/50 border border-gray-600 rounded-full mb-6">
+            <i className="fas fa-question-circle text-3xl text-gray-400"></i>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">No Questions Generated</h2>
-          <p className="text-gray-600 mb-6">Unable to generate quiz questions from the provided text.</p>
+          <h2 className="text-2xl font-bold text-white mb-4">No Questions Generated</h2>
+          <p className="text-gray-300 mb-6">Unable to generate quiz questions from the provided text.</p>
           <button
             onClick={onBack}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -299,46 +299,46 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
           <div className="flex items-center justify-between mb-8">
             <button
               onClick={onBack}
-              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-blue-600 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-blue-400 transition-colors"
             >
               <i className="fas fa-arrow-left"></i>
               Back to Home
             </button>
-            <h1 className="text-3xl font-bold text-gray-800">Quiz Complete!</h1>
+            <h1 className="text-3xl font-bold text-white">Quiz Complete!</h1>
             <div></div>
           </div>
 
           {/* Results Card */}
-          <div className="bg-white rounded-3xl shadow-xl p-8 text-center mb-8">
+          <div className="bg-gray-800 rounded-3xl shadow-xl p-8 text-center mb-8 border border-gray-700">
             <div className={`inline-flex items-center justify-center w-24 h-24 rounded-full mb-6 ${
-              isPassing ? 'bg-green-100' : 'bg-red-100'
+              isPassing ? 'bg-green-900/30 border border-green-500/30' : 'bg-red-900/30 border border-red-500/30'
             }`}>
               <i className={`fas ${isPassing ? 'fa-check-circle' : 'fa-times-circle'} text-4xl ${
-                isPassing ? 'text-green-600' : 'text-red-600'
+                isPassing ? 'text-green-400' : 'text-red-400'
               }`}></i>
             </div>
             
-            <h2 className="text-4xl font-bold text-gray-800 mb-2">
+            <h2 className="text-4xl font-bold text-white mb-2">
               {percentage}%
             </h2>
-            <p className="text-xl text-gray-600 mb-6">
+            <p className="text-xl text-gray-300 mb-6">
               You scored {score} out of {questions.length} questions
             </p>
             
-            <div className="bg-gray-50 rounded-2xl p-6 mb-8">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Performance Breakdown</h3>
+            <div className="bg-gray-700/50 rounded-2xl p-6 mb-8 border border-gray-600">
+              <h3 className="text-lg font-semibold text-white mb-4">Performance Breakdown</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">{score}</div>
-                  <div className="text-sm text-gray-600">Correct</div>
+                  <div className="text-2xl font-bold text-green-400">{score}</div>
+                  <div className="text-sm text-gray-300">Correct</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-red-600">{questions.length - score}</div>
-                  <div className="text-sm text-gray-600">Incorrect</div>
+                  <div className="text-2xl font-bold text-red-400">{questions.length - score}</div>
+                  <div className="text-sm text-gray-300">Incorrect</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{questions.length}</div>
-                  <div className="text-sm text-gray-600">Total</div>
+                  <div className="text-2xl font-bold text-blue-400">{questions.length}</div>
+                  <div className="text-sm text-gray-300">Total</div>
                 </div>
               </div>
             </div>
@@ -353,7 +353,7 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
               </button>
               <button
                 onClick={onBack}
-                className="w-full md:w-auto px-8 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold ml-4"
+                className="w-full md:w-auto px-8 py-3 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors font-semibold ml-4"
               >
                 <i className="fas fa-home mr-2"></i>
                 Back to Home
@@ -370,50 +370,50 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
   const userAnswer = userAnswers.get(currentQuestionIndex);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-gray-900">
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-blue-600 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-blue-400 transition-colors"
           >
             <i className="fas fa-arrow-left"></i>
             Back to Home
           </button>
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-gray-800">Interactive Quiz</h1>
-            <p className="text-gray-600">Question {currentQuestionIndex + 1} of {questions.length}</p>
+            <h1 className="text-3xl font-bold text-white">Interactive Quiz</h1>
+            <p className="text-gray-300">Question {currentQuestionIndex + 1} of {questions.length}</p>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold text-blue-600">{score}</div>
-            <div className="text-sm text-gray-600">Score</div>
+            <div className="text-2xl font-bold text-blue-400">{score}</div>
+            <div className="text-sm text-gray-300">Score</div>
           </div>
         </div>
 
         {/* Progress Bar */}
         <div className="mb-8">
-          <div className="flex justify-between text-sm text-gray-600 mb-2">
+          <div className="flex justify-between text-sm text-gray-300 mb-2">
             <span>Progress</span>
             <span>{Math.round(((currentQuestionIndex + 1) / questions.length) * 100)}%</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-3">
+          <div className="w-full bg-gray-700 rounded-full h-3">
             <div 
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 h-3 rounded-full transition-all duration-300"
+              className="bg-gradient-to-r from-blue-500 to-indigo-500 h-3 rounded-full transition-all duration-300"
               style={{width: `${((currentQuestionIndex + 1) / questions.length) * 100}%`}}
             ></div>
           </div>
         </div>
 
         {/* Question Card */}
-        <div className="bg-white rounded-3xl shadow-xl p-8 mb-8">
+        <div className="bg-gray-800 rounded-3xl shadow-xl p-8 mb-8 border border-gray-700">
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-4">
-              <span className="px-3 py-1 bg-blue-100 text-blue-600 rounded-full text-sm font-medium">
+              <span className="px-3 py-1 bg-blue-900/30 text-blue-400 rounded-full text-sm font-medium border border-blue-500/30">
                 {currentQuestion.category}
               </span>
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 leading-relaxed">
+            <h2 className="text-2xl font-bold text-white leading-relaxed">
               {currentQuestion.question}
             </h2>
           </div>
@@ -425,16 +425,16 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
               
               if (isAnswered && showResult) {
                 if (index === currentQuestion.correctAnswer) {
-                  optionClass += "border-green-500 bg-green-50 text-green-800";
+                  optionClass += "border-green-500 bg-green-900/20 text-green-400";
                 } else if (index === userAnswer && index !== currentQuestion.correctAnswer) {
-                  optionClass += "border-red-500 bg-red-50 text-red-800";
+                  optionClass += "border-red-500 bg-red-900/20 text-red-400";
                 } else {
-                  optionClass += "border-gray-200 bg-gray-50 text-gray-600";
+                  optionClass += "border-gray-600 bg-gray-700/50 text-gray-400";
                 }
               } else if (selectedAnswer === index) {
-                optionClass += "border-blue-500 bg-blue-50 text-blue-800";
+                optionClass += "border-blue-500 bg-blue-900/20 text-blue-400";
               } else {
-                optionClass += "border-gray-200 hover:border-blue-400 hover:bg-blue-50 text-gray-700";
+                optionClass += "border-gray-600 hover:border-blue-400 hover:bg-gray-700/50 text-gray-300";
               }
 
               return (
@@ -470,12 +470,12 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
 
           {/* Explanation */}
           {isAnswered && showResult && (
-            <div className="bg-gray-50 rounded-xl p-6 mb-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <i className="fas fa-lightbulb text-yellow-500"></i>
+            <div className="bg-gray-700/50 rounded-xl p-6 mb-6 border border-gray-600">
+              <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                <i className="fas fa-lightbulb text-yellow-400"></i>
                 Explanation
               </h3>
-              <p className="text-gray-700 leading-relaxed">{currentQuestion.explanation}</p>
+              <p className="text-gray-300 leading-relaxed">{currentQuestion.explanation}</p>
             </div>
           )}
 
@@ -484,7 +484,7 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
             <button
               onClick={handlePreviousQuestion}
               disabled={currentQuestionIndex === 0}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <i className="fas fa-chevron-left mr-2"></i>
               Previous
