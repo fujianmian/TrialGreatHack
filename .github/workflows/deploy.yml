@@ -44,8 +44,8 @@ jobs:
             jq --arg IMAGE "$NEW_IMAGE" '
               del(.tags, .pidMode, .ipcMode, .proxyConfiguration, .inferenceAccelerators, .ephemeralStorage) |
               .containerDefinitions[0].image=$IMAGE |
-              .cpu="32768" | 
-              .memory="65536"
+              .cpu=32768 | 
+              .memory=65536
             ' taskdef.json > new-taskdef.json
 
             TASKDEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json | jq -r '.taskDefinition.taskDefinitionArn')
@@ -60,6 +60,7 @@ jobs:
             echo $AWS_REGION
             echo $AWS_DEFAULT_REGION
             aws ecs update-service \
+            --region ap-southeast-5 \
             --cluster my-ecs-cluster \
             --service nextjs-task-service-v0fg7npw \
             --health-check-grace-period-seconds 60 \
