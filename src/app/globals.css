@@ -79,6 +79,35 @@
   }
 }
 
+/* Chat Widget Animations */
+@keyframes chat-widget-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 8px 25px rgba(94, 46, 143, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 12px 35px rgba(94, 46, 143, 0.4);
+  }
+}
+
+@keyframes chat-widget-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.chat-widget-float {
+  animation: chat-widget-float 3s ease-in-out infinite;
+}
+
+.chat-widget-pulse {
+  animation: chat-widget-pulse 2s ease-in-out infinite;
+}
+
 .liquid-glass-header {
   animation: liquid-glass-wave 4s ease-in-out infinite, liquid-glass-glow 3s ease-in-out infinite;
 }

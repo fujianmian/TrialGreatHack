@@ -6,6 +6,7 @@ import TextToSummary from './ttosummary/texttosummary';
 import TextToMap from './ttomap/texttomap';
 import TextToVideo from './ttovideo/texttovideo';
 import TextToQuiz from './texttoquiz/texttoquiz';
+import ChatBox from './chatbox';
 
 interface InputMethod {
   id: string;
@@ -707,6 +708,9 @@ export default function Home() {
           </div>
         </div>
       </footer>
+      
+      {/* Chat Widget */}
+      <ChatBox />
     </div>
   );
 }

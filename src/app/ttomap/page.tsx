@@ -5,6 +5,7 @@ interface MindmapPageProps {
   searchParams: Promise<{ text?: string }>;
 }
 
+// this is the page for the mindmap
 function MindmapPageContent({ searchParams }: MindmapPageProps) {
   return <TextToMap searchParams={searchParams} />;
 }
