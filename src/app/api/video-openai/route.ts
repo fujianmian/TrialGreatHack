@@ -81,13 +81,6 @@ export async function POST(request: NextRequest) {
       console.log("📝 Text length:", text.length);
       console.log("🎨 Video style:", videoStyle);
 
-      // Check OpenAI API key
-      if (!process.env.OPENAI_API_KEY) {
-        return NextResponse.json(
-          { message: 'OpenAI API key not configured in .env.local' },
-          { status: 400 }
-        );
-      }
 
       // Use OpenAI for script generation
       const openai = new OpenAI({
