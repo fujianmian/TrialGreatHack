@@ -38,40 +38,27 @@ export default function ChatBox({ onClose }: ChatBoxProps) {
           content: msg.text
         }));
 
-      // Call OpenAI API directly
+      // Call your secure API route (matching your API route path and expected format)
       const response = await fetch('/api/chatbox', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'gpt-4',
-          messages: [
-            {
-              role: 'system',
-              content: "You are an AI study assistant for EduAI. You can help with homework questions, explain academic concepts, suggest study strategies, and guide users on how to use learning tools like videos, flashcards, mind maps, quizzes, and summaries. Be helpful, encouraging, and educational in your responses."
-            },
-            ...conversationHistory,
-            {
-              role: 'user',
-              content: currentMessage
-            }
-          ],
-          max_tokens: 1000,
-          temperature: 0.7,
+          message: currentMessage,
+          conversationHistory: conversationHistory
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`OpenAI API call failed: ${response.status}`);
+        throw new Error(`API call failed: ${response.status}`);
       }
 
       const data = await response.json();
       
       const botMessage = {
         id: messages.length + 2,
-        text: data.choices?.[0]?.message?.content || "I apologize, but I'm having trouble responding right now. Please try again.",
+        text: data.response || "I apologize, but I'm having trouble responding right now. Please try again.",
         sender: 'bot' as const,
         timestamp: new Date()
       };
