@@ -27,6 +27,23 @@ interface ContentAnalysis {
   emotional_tone: string;
 }
 
+interface BackgroundImage {
+  description: string;
+  visual_elements: string[];
+  lighting: string;
+  colors: string;
+}
+
+interface OpenAIAnalysis {
+  themes: string[];
+  backgrounds: BackgroundImage[];
+  visual_metaphors: string[];
+  target_audience: string;
+  emotional_tone: string;
+  color_palette: string;
+  style_recommendations: string;
+}
+
 interface VideoResponse {
   title: string;
   slides: VideoSlide[];
@@ -39,6 +56,9 @@ interface VideoResponse {
   style?: string;
   shots?: VideoShot[];
   content_analysis?: ContentAnalysis;
+  // OpenAI enhanced fields
+  openai_analysis?: OpenAIAnalysis;
+  background_images?: BackgroundImage[];
 }
 
 interface TextToVideoProps {
@@ -493,7 +513,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
               <div className="p-3 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-700">
                   <i className="fas fa-info-circle mr-2"></i>
-                  This video was generated using advanced AI analysis. Nova Pro analyzes your content to suggest specific backgrounds, visual elements, and scenes. Nova Reel then creates dynamic videos with contextual environments, relevant props, and professional cinematography - making each video unique and engaging rather than generic.
+                  This video was generated using advanced AI analysis. OpenAI analyzes your content to suggest specific backgrounds, visual elements, and scenes. The system then creates dynamic videos with contextual environments, relevant props, and professional cinematography - making each video unique and engaging rather than generic.
                 </p>
               </div>
               
@@ -504,8 +524,101 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
                     Enhanced Video Breakdown
                   </h4>
                   
-                  {/* Content Analysis */}
-                  {video.content_analysis && (
+                  {/* OpenAI Enhanced Analysis */}
+                  {video.openai_analysis && (
+                    <div className="mb-4 bg-white rounded-lg p-3 shadow-sm">
+                      <h5 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                        <i className="fas fa-magic text-green-500"></i>
+                        OpenAI Enhanced Analysis
+                      </h5>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="font-medium text-gray-700">Themes:</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {video.openai_analysis.themes.map((theme, idx) => (
+                              <span key={idx} className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
+                                {theme}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Visual Metaphors:</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {video.openai_analysis.visual_metaphors.map((metaphor, idx) => (
+                              <span key={idx} className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">
+                                {metaphor}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Target Audience:</span>
+                          <span className="ml-2 text-gray-600">{video.openai_analysis.target_audience}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Emotional Tone:</span>
+                          <span className="ml-2 text-gray-600">{video.openai_analysis.emotional_tone}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Color Palette:</span>
+                          <span className="ml-2 text-gray-600">{video.openai_analysis.color_palette}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Style:</span>
+                          <span className="ml-2 text-gray-600">{video.openai_analysis.style_recommendations}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Background Images Section */}
+                  {video.background_images && video.background_images.length > 0 && (
+                    <div className="mb-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4">
+                      <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                        <i className="fas fa-image text-green-600"></i>
+                        AI-Generated Background Suggestions
+                      </h5>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {video.background_images.map((bg, index) => (
+                          <div key={index} className="bg-white rounded-lg p-3 shadow-sm">
+                            <div className="flex items-start gap-3">
+                              <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                                {index + 1}
+                              </div>
+                              <div className="flex-1">
+                                <h6 className="font-medium text-gray-800 mb-1">Background {index + 1}</h6>
+                                <p className="text-sm text-gray-600 mb-2">{bg.description}</p>
+                                <div className="space-y-1">
+                                  <div>
+                                    <span className="text-xs font-medium text-gray-700">🎨 Visual Elements:</span>
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {bg.visual_elements.map((element, idx) => (
+                                        <span key={idx} className="bg-blue-100 text-blue-800 px-1 py-0.5 rounded text-xs">
+                                          {element}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div className="text-xs">
+                                    <span className="font-medium text-gray-700">💡 Lighting:</span>
+                                    <span className="ml-1 text-gray-600">{bg.lighting}</span>
+                                  </div>
+                                  <div className="text-xs">
+                                    <span className="font-medium text-gray-700">🎨 Colors:</span>
+                                    <span className="ml-1 text-gray-600">{bg.colors}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fallback Content Analysis */}
+                  {!video.openai_analysis && video.content_analysis && (
                     <div className="mb-4 bg-white rounded-lg p-3 shadow-sm">
                       <h5 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
                         <i className="fas fa-brain text-blue-500"></i>
