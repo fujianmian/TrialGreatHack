@@ -14,13 +14,50 @@ export async function POST(req: Request) {
     let video;
     try {
       console.log("🎬 Attempting Nova Reel video generation...");
+      console.log("📝 Text length:", text.length);
+      console.log("🎨 Video style:", videoStyle);
+      console.log("🔑 AWS Region:", process.env.AWS_REGION);
+      console.log("🪣 S3 Bucket:", process.env.AWS_S3_BUCKET ? "Set" : "Not set");
+      
       video = await generateNovaReelVideo(text, videoStyle);
       console.log("✅ Nova Reel video generation successful");
     } catch (novaError) {
-      console.warn("⚠️ Nova Reel video generation failed, using slides fallback:", novaError instanceof Error ? novaError.message : String(novaError));
-      console.log("🔄 Switching to slides-based video generation...");
-      video = generateVideo(text);
-      console.log("✅ Fallback video generation complete");
+      console.error("❌ Nova Reel video generation failed:", novaError instanceof Error ? novaError.message : String(novaError));
+      
+      // For development/testing, create a mock video response
+      if (process.env.NODE_ENV === 'development') {
+        console.log("🧪 Creating mock video for development testing...");
+        video = {
+          title: extractTitleFromText(text),
+          videoUrl: "https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4", // Sample video URL
+          duration: 30,
+          type: 'nova_reel_video',
+          transcript: text,
+          slides: [],
+          style: videoStyle,
+          shots: [{
+            prompt: "Mock video shot for development testing",
+            weight: 1.0,
+            description: "Development test shot",
+            background: "professional studio",
+            visual_elements: ["test graphics"],
+            camera_movement: "smooth tracking",
+            lighting: "professional lighting"
+          }],
+          content_analysis: {
+            key_themes: ["development", "testing"],
+            visual_metaphors: ["mock video"],
+            target_audience: "developers",
+            emotional_tone: "professional"
+          }
+        };
+        console.log("✅ Mock video created for development");
+      } else {
+        console.log("🔄 Switching to slides-based video generation...");
+        video = generateVideo(text);
+        video.type = 'slides_fallback'; // Mark as fallback
+        console.log("✅ Fallback video generation complete");
+      }
     }
 
     return NextResponse.json({ result: video });
@@ -149,21 +186,15 @@ async function generateNovaReelVideo(text: string, videoStyle: string = "educati
     
     console.log("🎬 Generating engaging video with Nova Reel...");
     
-    // Create enhanced video generation request for Nova Reel with specific visual details
+    // Create simplified video generation request for Nova Reel
+    // Using only the basic parameters that Nova Reel supports
     const videoRequest = {
       text_prompts: videoScript.shots.map((shot, index) => ({
         text: `Shot ${index + 1}: ${shot.prompt}. Background: ${shot.background || 'professional studio'}. Visual elements: ${shot.visual_elements?.join(', ') || 'dynamic graphics'}. Camera: ${shot.camera_movement || 'smooth tracking'}. Lighting: ${shot.lighting || 'professional lighting'}`,
         weight: shot.weight || 1.0
       })),
       duration: videoScript.duration,
-      output_format: "mp4",
-      quality: "high",
-      style: videoScript.style,
-      aspect_ratio: "16:9", // YouTube standard
-      motion_intensity: "high", // More dynamic movement
-      camera_movement: "dynamic",
-      background_type: "contextual", // Use contextual backgrounds
-      visual_complexity: "detailed" // More detailed visuals
+      output_format: "mp4"
     };
 
     const input = {
@@ -173,16 +204,24 @@ async function generateNovaReelVideo(text: string, videoStyle: string = "educati
       body: JSON.stringify(videoRequest)
     };
 
+    console.log("📤 Sending request to Nova Reel with:", JSON.stringify(videoRequest, null, 2));
+    
     const command = new InvokeModelCommand(input);
     const response = await client.send(command);
     
+    console.log("📥 Raw Nova Reel response:", response);
+    console.log("📥 Response status:", response.$metadata?.httpStatusCode);
+    
     const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+    console.log("📥 Parsed Nova Reel response body:", JSON.stringify(responseBody, null, 2));
     
     console.log("✅ Enhanced Nova Reel response received");
 
     // Extract video information from Nova Reel response
     if (responseBody.video_url || responseBody.s3_location) {
       const videoUrl = responseBody.video_url || responseBody.s3_location;
+      
+      console.log("🎬 Video URL found:", videoUrl);
       
       return {
         title: videoScript.title,
@@ -192,9 +231,11 @@ async function generateNovaReelVideo(text: string, videoStyle: string = "educati
         transcript: videoScript.transcript,
         slides: [], // Empty for actual video
         style: videoScript.style,
-        shots: videoScript.shots
+        shots: videoScript.shots,
+        content_analysis: videoScript.content_analysis
       };
     } else {
+      console.log("❌ No video URL found in response. Available keys:", Object.keys(responseBody));
       throw new Error("No video URL found in Nova Reel response");
     }
 
@@ -268,39 +309,39 @@ Return as JSON:
 Text to analyze:
 ${text}`;
 
-  const input = {
+    const input = {
     modelId: 'amazon.nova-pro-v1:0',
-    contentType: 'application/json',
-    accept: 'application/json',
-    body: JSON.stringify({
-      anthropic_version: 'bedrock-2023-05-31',
+      contentType: 'application/json',
+      accept: 'application/json',
+      body: JSON.stringify({
+        anthropic_version: 'bedrock-2023-05-31',
       max_tokens: 2000,
       temperature: 0.7,
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ]
-    })
-  };
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ]
+      })
+    };
 
-  const command = new InvokeModelCommand(input);
-  const response = await client.send(command);
-  
-  const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-  const aiResponse = responseBody.content[0].text;
+    const command = new InvokeModelCommand(input);
+    const response = await client.send(command);
+    
+    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+    const aiResponse = responseBody.content[0].text;
 
-  // Parse the JSON response
-  try {
-    const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
+    // Parse the JSON response
+    try {
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
       const videoScript = JSON.parse(jsonMatch[0]);
       return videoScript;
-    } else {
+      } else {
       throw new Error("No valid JSON found in Nova Pro response");
-    }
-  } catch (parseError) {
+      }
+    } catch (parseError) {
     console.error("Failed to parse Nova Pro response:", parseError);
     // Fallback to simple script generation
     return generateFallbackVideoScript(text);
