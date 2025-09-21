@@ -41,9 +41,11 @@ jobs:
             --output json > taskdef.json
 
             NEW_IMAGE="268060978153.dkr.ecr.ap-southeast-5.amazonaws.com/greataihack1:${{ github.sha }}"
-            jq --arg IMAGE "$NEW_IMAGE" '
+            jq --arg IMAGE "$NEW_IMAGE" --arg OPENAI_KEY "${{ secrets.OPENAI_API_KEY }}" '
               del(.tags, .pidMode, .ipcMode, .proxyConfiguration, .inferenceAccelerators, .ephemeralStorage) |
-              .containerDefinitions[0].image=$IMAGE
+              .containerDefinitions[0].image=$IMAGE |
+              .containerDefinitions[0].environment = (.containerDefinitions[0].environment // []) |
+              .containerDefinitions[0].environment |= map(select(.name != "OPENAI_API_KEY")) + [{"name": "OPENAI_API_KEY", "value": $OPENAI_KEY}]
             ' taskdef.json > new-taskdef.json
 
             TASKDEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json | jq -r '.taskDefinition.taskDefinitionArn')
