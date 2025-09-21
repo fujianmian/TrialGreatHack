@@ -75,7 +75,7 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
       console.error('[TextToQuiz] Error generating quiz:', err);
       setError(err instanceof Error ? err.message : 'Failed to generate quiz');
       setIsGenerating(false);
-      // Fallback to mock data if API fails to triggeffeeeeeeeeeeeeeee
+      // Fallback to mock data if API fails to triggeffeee
       const generateFallbackQuestions = (count: number, difficulty: string): QuizQuestion[] => {
         const baseQuestions = [
           {
