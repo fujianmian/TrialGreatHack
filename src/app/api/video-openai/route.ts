@@ -159,8 +159,8 @@ ${text}`;
 
     } catch (novaError) {
       console.error("❌ Nova Reel API failed:", novaError);
-      // Fallback to placeholder video
-      videoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4";
+      // Fallback to Nova Reel video
+      videoUrl = "https://nova-reel-videos-20.s3.us-east-1.amazonaws.com/shot-3/m07dmm6kbacl/output.mp4";
       console.log("🔄 Using fallback video URL");
     }
 

@@ -115,7 +115,7 @@ ${text}`;
       // Convert to video format
       const video = {
         title: videoScript.title,
-        videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4", // Dynamic video selection
+        videoUrl: "https://nova-reel-videos-20.s3.us-east-1.amazonaws.com/shot-3/m07dmm6kbacl/output.mp4", // Nova Reel fallback video
         duration: videoScript.duration,
         type: 'nova_pro_video',
         transcript: videoScript.transcript,

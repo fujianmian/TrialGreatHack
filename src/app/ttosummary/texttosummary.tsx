@@ -65,7 +65,7 @@ export default function TextToSummary({ inputText, onBack }: TextToSummaryProps)
 
   if (isGenerating) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mx-auto mb-6"></div>
           <h2 className="text-2xl font-bold text-gray-800 mb-4">Generating Summary</h2>
@@ -77,7 +77,7 @@ export default function TextToSummary({ inputText, onBack }: TextToSummaryProps)
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full text-center">
           <div className="text-red-500 text-6xl mb-6">⚠️</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-4">Error Generating Summary</h2>
@@ -95,7 +95,7 @@ export default function TextToSummary({ inputText, onBack }: TextToSummaryProps)
 
   if (!summary) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full text-center">
           <div className="text-gray-400 text-6xl mb-6">📝</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-4">No Summary Available</h2>
@@ -112,7 +112,7 @@ export default function TextToSummary({ inputText, onBack }: TextToSummaryProps)
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100 p-4">
+    <div className="min-h-screen bg-gray-900 p-4">
       {/* Copy Feedback Notification */}
       {copyFeedback && (
         <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2">

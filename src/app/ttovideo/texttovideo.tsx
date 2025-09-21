@@ -224,19 +224,19 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
 
   if (isGenerating) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full text-center">
           <div className="relative mb-6">
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mx-auto"></div>
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#5E2E8F] border-t-transparent mx-auto"></div>
             <div className="absolute inset-0 flex items-center justify-center">
-              <i className="fas fa-video text-blue-500 text-xl"></i>
+              <i className="fas fa-video text-[#5E2E8F] text-xl"></i>
             </div>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Creating Your Video</h2>
-          <p className="text-gray-600 mb-4">
+          <h2 className="text-2xl font-bold text-black mb-4">Creating Your Video</h2>
+          <p className="text-black mb-4">
             {generationStep || 'Using AI to analyze your content and generate an engaging video...'}
           </p>
-          <div className="space-y-2 text-sm text-gray-500">
+          <div className="space-y-2 text-sm text-black">
             <div className="flex items-center justify-center gap-2">
               <i className="fas fa-brain text-purple-500"></i>
               <span>Analyzing content with Nova Pro AI</span>
@@ -257,14 +257,14 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full text-center">
           <div className="text-red-500 text-6xl mb-6">⚠️</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Error Generating Video</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
+          <h2 className="text-2xl font-bold text-black mb-4">Error Generating Video</h2>
+          <p className="text-black mb-6">{error}</p>
           <button
             onClick={onBack}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+            className="bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] hover:from-[#4A2480] hover:to-[#C41A75] text-white px-6 py-3 rounded-lg font-semibold transition-colors"
           >
             Go Back
           </button>
@@ -275,12 +275,12 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
 
   if (!video && !isGenerating) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-100 p-4">
+      <div className="min-h-screen bg-gray-900 p-4">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
           <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-3xl font-bold text-gray-800">Create Your Video</h1>
+              <h1 className="text-3xl font-bold text-black">Create Your Video</h1>
               <button
                 onClick={onBack}
                 className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2"
@@ -291,13 +291,13 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
             
             <div className="text-center mb-6">
               <div className="text-6xl mb-4">🎬</div>
-              <h2 className="text-xl font-semibold text-gray-700 mb-2">Generate YouTube-Style Video</h2>
-              <p className="text-gray-600">Transform your text into an engaging, professional video with AI</p>
+              <h2 className="text-xl font-semibold text-black mb-2">Generate YouTube-Style Video</h2>
+              <p className="text-black">Transform your text into an engaging, professional video with AI</p>
             </div>
             
             {/* Style Selector */}
             <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-black mb-2">
                 Choose Video Style:
               </label>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -325,7 +325,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
               </div>
               <button
                 onClick={generateVideo}
-                className="mt-6 w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-lg"
+                className="mt-6 w-full bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] hover:from-[#4A2480] hover:to-[#C41A75] text-white px-6 py-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-lg"
               >
                 <i className="fas fa-video"></i>
                 Generate {selectedStyle.charAt(0).toUpperCase() + selectedStyle.slice(1)} Video
@@ -353,12 +353,12 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
   const hasSlides = video?.slides && video.slides.length > 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-100 p-4">
+    <div className="min-h-screen bg-gray-900 p-4">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
+        <div className="bg-gray-900 rounded-3xl px-8 shadow-lg border border-gray-700 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold text-gray-800">
+            <h1 className="text-3xl font-bold text-white">
               {isNovaReelVideo ? 'AI Generated Video' : isSlidesPresentation ? 'Interactive Presentation' : 'Video Presentation'}
             </h1>
             <button
@@ -370,13 +370,13 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
           </div>
           
           <div className="text-center">
-            <h2 className="text-xl font-semibold text-gray-700 mb-2">{video?.title}</h2>
+            <h2 className="text-xl font-semibold text-white mb-2">{video?.title}</h2>
             {isNovaReelVideo ? (
-              <p className="text-gray-600">Duration: {video?.duration || 30} seconds • AI Generated Video</p>
+              <p className="text-white">Duration: {video?.duration || 30} seconds • AI Generated Video</p>
             ) : isSlidesPresentation ? (
-              <p className="text-gray-600">Duration: {Math.round(video?.duration || 0)} seconds • {video?.slides?.length || 0} slides • Interactive Presentation</p>
+              <p className="text-white">Duration: {Math.round(video?.duration || 0)} seconds • {video?.slides?.length || 0} slides • Interactive Presentation</p>
             ) : (
-              <p className="text-gray-600">Duration: {Math.round(video?.totalDuration || 0)} seconds • {video?.slides?.length || 0} slides</p>
+              <p className="text-white">Duration: {Math.round(video?.totalDuration || 0)} seconds • {video?.slides?.length || 0} slides</p>
             )}
           </div>
           
@@ -448,7 +448,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
               </div>
               
               <div className="text-center space-y-2">
-                <div className="flex items-center justify-center gap-4 text-sm text-gray-600">
+                <div className="flex items-center justify-center gap-4 text-sm text-black">
                   <span className="flex items-center gap-1">
                     <i className="fas fa-video text-blue-500"></i>
                     Duration: {video.duration || 30}s
@@ -471,7 +471,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
                 
                 {/* Debug Information */}
                 <details className="text-left mt-4">
-                  <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">Debug Info</summary>
+                  <summary className="text-xs text-black cursor-pointer hover:text-gray-600">Debug Info</summary>
                   <div className="mt-2 p-3 bg-gray-100 rounded text-xs text-gray-600 space-y-1">
                     <div><strong>Current Video URL:</strong> {video.videoUrl}</div>
                     <div><strong>Video Type:</strong> {video.type}</div>
@@ -480,7 +480,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
                   </div>
                 </details>
                 
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-black">
                   Powered by Amazon Nova Pro & Nova Reel AI • YouTube-ready quality
                 </p>
               </div>
@@ -506,7 +506,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
                   {/* Progress Bar */}
                   <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-700">
                     <div 
-                      className="h-full bg-blue-500 transition-all duration-100"
+                      className="h-full bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] transition-all duration-100"
                       style={{ width: `${progress}%` }}
                     ></div>
                   </div>
@@ -524,7 +524,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
                   
                   <button
                     onClick={playPause}
-                    className="p-4 rounded-full bg-blue-500 hover:bg-blue-600 text-white transition-colors"
+                    className="p-4 rounded-full bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] hover:from-[#4A2480] hover:to-[#C41A75] text-white transition-colors"
                   >
                     <i className={`fas ${isPlaying ? 'fa-pause' : 'fa-play'} text-xl`}></i>
                   </button>
@@ -539,7 +539,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
                 </div>
 
                 {/* Slide Counter */}
-                <div className="text-center mt-4 text-gray-600">
+                <div className="text-center mt-4 text-black">
                   Slide {currentSlide + 1} of {video?.slides?.length || 0}
                 </div>
               </div>

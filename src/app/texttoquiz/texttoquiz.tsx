@@ -223,17 +223,17 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
 
   if (isGenerating) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-6">
-            <i className="fas fa-spinner fa-spin text-3xl text-blue-600"></i>
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-[#5E2E8F]/10 rounded-full mb-6">
+            <i className="fas fa-spinner fa-spin text-3xl text-[#5E2E8F]"></i>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Generating Quiz...</h2>
-          <p className="text-gray-600 max-w-md mx-auto">
+          <h2 className="text-2xl font-bold text-white mb-4">Generating Quiz...</h2>
+          <p className="text-white max-w-md mx-auto">
             Our AI is analyzing your content and creating interactive quiz questions for better learning.
           </p>
           <div className="w-full bg-gray-200 rounded-full h-2 max-w-md mx-auto mt-6">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 h-2 rounded-full animate-pulse" style={{width: '70%'}}></div>
+            <div className="bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] h-2 rounded-full animate-pulse" style={{width: '70%'}}></div>
           </div>
         </div>
       </div>
@@ -242,13 +242,13 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="max-w-md mx-auto text-center">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 rounded-full mb-6">
             <i className="fas fa-exclamation-triangle text-3xl text-red-600"></i>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Error Generating Quiz</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
+          <h2 className="text-2xl font-bold text-white mb-4">Error Generating Quiz</h2>
+          <p className="text-white mb-6">{error}</p>
           <div className="space-y-3">
             <button
               onClick={generateQuiz}
@@ -270,7 +270,7 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
 
   if (questions.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="max-w-md mx-auto text-center">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-100 rounded-full mb-6">
             <i className="fas fa-question-circle text-3xl text-gray-600"></i>
@@ -293,7 +293,7 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
     const isPassing = percentage >= 70;
     
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      <div className="min-h-screen bg-gray-900">
         <div className="max-w-4xl mx-auto px-4 py-8">
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
