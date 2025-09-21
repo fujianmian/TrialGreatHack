@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-// @ts-expect-error "Suppressing TS error for pdf-parse import"
 import pdfParse from 'pdf-parse';
 import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import { createBedrockClient } from '@/lib/bedrock';
