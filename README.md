@@ -96,6 +96,8 @@ AWS_REGION=us-east-1
 
 # S3 Bucket for video storage (required for Nova Reel)
 AWS_S3_BUCKET=your-video-bucket-name
+
+OPENAI_API_KEY=your-openai-key
 ```
 
 **Important Setup Steps:**
