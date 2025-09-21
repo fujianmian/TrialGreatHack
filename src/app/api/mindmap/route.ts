@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createBedrockClient } from '@/lib/bedrock';
 
 export async function POST(req: Request) {
   try {
@@ -218,13 +219,7 @@ async function generateAIMindMap(text: string) {
     // Dynamic import to handle potential module not found errors
     const { BedrockRuntimeClient, InvokeModelCommand } = await import('@aws-sdk/client-bedrock-runtime');
     
-    const client = new BedrockRuntimeClient({
-      region: process.env.AWS_REGION || 'us-east-1',
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-      },
-    });
+    const client = createBedrockClient();
 
     const prompt = `Please analyze the following text and create a mind map structure.
 

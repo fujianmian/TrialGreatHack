@@ -262,12 +262,12 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
     const totalCount = videoData?.totalShots || 0;
     
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full text-center">
           <div className="relative mb-6">
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mx-auto"></div>
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#5E2E8F] border-t-transparent mx-auto"></div>
             <div className="absolute inset-0 flex items-center justify-center">
-              <i className="fas fa-video text-blue-500 text-xl"></i>
+              <i className="fas fa-video text-[#5E2E8F] text-xl"></i>
             </div>
           </div>
           
@@ -379,14 +379,14 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full text-center">
           <div className="text-red-500 text-6xl mb-6">⚠️</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-4">Error Generating Videos</h2>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
             onClick={onBack}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+            className="bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] hover:from-[#4A2480] hover:to-[#C41A75] text-white px-6 py-3 rounded-lg font-semibold transition-colors"
           >
             Go Back
           </button>
@@ -397,7 +397,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
 
   if (!videoData && !isGenerating) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-100 p-4">
+      <div className="min-h-screen bg-gray-900 p-4">
         <div className="max-w-4xl mx-auto">
           <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
@@ -417,7 +417,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
             </div>
             
             <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-black mb-2">
                 Choose Video Style:
               </label>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -445,7 +445,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
               </div>
               <button
                 onClick={generateVideo}
-                className="mt-6 w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-lg"
+                className="mt-6 w-full bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] hover:from-[#4A2480] hover:to-[#C41A75] text-white px-6 py-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-lg"
               >
                 <i className="fas fa-video"></i>
                 Generate {selectedStyle.charAt(0).toUpperCase() + selectedStyle.slice(1)} Videos
@@ -470,10 +470,10 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
   const primaryVideo = availableVideos.length > 0 ? availableVideos[0] : null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-100 p-4">
+    <div className="min-h-screen bg-gray-900 p-4">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
+        <div className="bg-gray-900 rounded-3xl px-8 shadow-lg border border-gray-700 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-3xl font-bold text-gray-800">AI Generated Video</h1>
             <button

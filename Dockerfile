@@ -1,9 +1,12 @@
 # Stage 1: build
 FROM node:18-alpine AS builder
 WORKDIR /app
+
 # Copy package files first for caching
 COPY package*.json ./
-RUN npm ci
+COPY package.json package-lock.json ./
+COPY patches ./patches
+RUN npm install
 COPY . .
 RUN npm run build
 
@@ -24,4 +27,3 @@ EXPOSE 3000
 
 # Start Next.js in production mode
 CMD ["npx", "next", "start", "-p", "3000", "-H", "0.0.0.0"]
-

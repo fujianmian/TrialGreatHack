@@ -19,6 +19,111 @@
   }
 }
 
+/* iOS 26 Liquid Glass Animations */
+@keyframes liquid-glass-shimmer {
+  0% {
+    transform: translateX(-100%) rotate(45deg);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%) rotate(45deg);
+    opacity: 0;
+  }
+}
+
+@keyframes liquid-glass-wave {
+  0%, 100% {
+    transform: translateY(0px) scaleY(1);
+  }
+  50% {
+    transform: translateY(-2px) scaleY(1.02);
+  }
+}
+
+@keyframes liquid-glass-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(255, 255, 255, 0.2), 0 0 60px rgba(255, 255, 255, 0.1);
+  }
+}
+
+@keyframes logo-glow {
+  0% {
+    filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 40px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 60px rgba(255, 255, 255, 0.4));
+  }
+  100% {
+    filter: drop-shadow(0 0 30px rgba(255, 255, 255, 1)) drop-shadow(0 0 60px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 90px rgba(255, 255, 255, 0.6));
+  }
+}
+
+@keyframes logo-glow-indigo {
+  0% {
+    filter: drop-shadow(0 0 20px rgba(99, 102, 241, 0.8)) drop-shadow(0 0 40px rgba(79, 70, 229, 0.6)) drop-shadow(0 0 60px rgba(67, 56, 202, 0.4));
+  }
+  100% {
+    filter: drop-shadow(0 0 30px rgba(99, 102, 241, 1)) drop-shadow(0 0 60px rgba(79, 70, 229, 0.8)) drop-shadow(0 0 90px rgba(67, 56, 202, 0.6));
+  }
+}
+
+@keyframes logo-glow-purple {
+  0% {
+    filter: drop-shadow(0 0 20px rgba(147, 51, 234, 0.8)) drop-shadow(0 0 40px rgba(126, 34, 206, 0.6)) drop-shadow(0 0 60px rgba(109, 40, 217, 0.4));
+  }
+  100% {
+    filter: drop-shadow(0 0 30px rgba(147, 51, 234, 1)) drop-shadow(0 0 60px rgba(126, 34, 206, 0.8)) drop-shadow(0 0 90px rgba(109, 40, 217, 0.6));
+  }
+}
+
+/* Chat Widget Animations */
+@keyframes chat-widget-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 8px 25px rgba(94, 46, 143, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 12px 35px rgba(94, 46, 143, 0.4);
+  }
+}
+
+@keyframes chat-widget-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.chat-widget-float {
+  animation: chat-widget-float 3s ease-in-out infinite;
+}
+
+.chat-widget-pulse {
+  animation: chat-widget-pulse 2s ease-in-out infinite;
+}
+
+.liquid-glass-header {
+  animation: liquid-glass-wave 4s ease-in-out infinite, liquid-glass-glow 3s ease-in-out infinite;
+}
+
+.liquid-glass-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  animation: liquid-glass-shimmer 3s ease-in-out infinite;
+  border-radius: inherit;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
