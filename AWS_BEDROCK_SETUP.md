@@ -19,6 +19,7 @@ Your application is trying to use AWS Bedrock AI models but failing with these e
 You need to request access to:
 - `amazon.nova-pro-v1:0` (Primary - Amazon Nova Pro) ✅ **PERMISSION GRANTED**
 - `amazon.nova-lite-v1:0` (Secondary - Amazon Nova Lite)
+- `amazon.nova-reel-v1:0` (Video Generation - Amazon Nova Reel) ⚠️ **REQUIRED FOR VIDEO**
 - `anthropic.claude-3-haiku-20240307-v1:0` (Fallback)
 - `anthropic.claude-3-sonnet-20240229-v1:0` (Fallback)
 
@@ -28,6 +29,7 @@ Make sure your `.env.local` file has:
 AWS_ACCESS_KEY_ID=your_access_key
 AWS_SECRET_ACCESS_KEY=your_secret_key
 AWS_REGION=us-east-1
+AWS_S3_BUCKET=your-video-bucket-name
 ```
 
 ### 4. Check IAM Permissions
@@ -43,6 +45,15 @@ Your AWS user/role needs these permissions:
                 "bedrock:ListFoundationModels"
             ],
             "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:PutObject",
+                "s3:GetObject",
+                "s3:DeleteObject"
+            ],
+            "Resource": "arn:aws:s3:::your-video-bucket-name/*"
         }
     ]
 }
@@ -70,6 +81,13 @@ AWS_REGION=us-west-2
 - **🎯 Better Quality**: Higher quality flashcard generation
 - **⚡ Fast**: Optimized for AWS Bedrock infrastructure
 - **💰 Cost-Effective**: Amazon's own model with competitive pricing
+
+## Nova Reel for Video Generation
+- **🎬 Studio Quality**: Generate realistic, high-quality videos from text
+- **⏱️ Flexible Duration**: Create videos up to 2 minutes (multiple 6-second shots)
+- **🎨 Consistent Style**: Maintain visual consistency across video shots
+- **🖼️ Image Support**: Use reference images to guide video generation
+- **📱 Easy Integration**: Simple API calls through AWS Bedrock
 
 ## Test the Fix
 After requesting model access (can take a few minutes to hours), restart your dev server:
