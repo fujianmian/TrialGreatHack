@@ -1,13 +1,15 @@
-'use client';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 
-import React, { useState, useEffect, useCallback } from 'react';
-
-interface VideoSlide {
-  id: number;
+interface VideoJob {
+  shotIndex: number;
+  shotId: string;
   title: string;
-  content: string;
-  duration: number;
-  type: 'title' | 'content' | 'conclusion';
+  prompt: string;
+  invocationArn: string;
+  status: string;
+  s3Path: string;
+  s3Url: string;
+  shot: VideoShot;
 }
 
 interface VideoShot {
@@ -27,18 +29,20 @@ interface ContentAnalysis {
   emotional_tone: string;
 }
 
-interface VideoResponse {
+interface MultiVideoResponse {
   title: string;
-  slides: VideoSlide[];
-  totalDuration: number;
+  duration: number;
+  type: string;
   transcript: string;
-  // Nova Reel specific fields
-  videoUrl?: string;
-  duration?: number;
-  type?: string;
-  style?: string;
-  shots?: VideoShot[];
+  style: string;
   content_analysis?: ContentAnalysis;
+  totalShots: number;
+  successfulJobs: number;
+  failedJobsCount?: number;
+  videoJobs: VideoJob[];
+  failedJobs?: any[];
+  estimatedTime: string;
+  s3Bucket: string;
 }
 
 interface TextToVideoProps {
@@ -47,22 +51,36 @@ interface TextToVideoProps {
 }
 
 export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
-  const [video, setVideo] = useState<VideoResponse | null>(null);
+  const [videoData, setVideoData] = useState<MultiVideoResponse | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [videoError, setVideoError] = useState<string | null>(null);
-  const [generationStep, setGenerationStep] = useState<string>('');
   const [selectedStyle, setSelectedStyle] = useState<string>('educational');
-  const [videoLoadingState, setVideoLoadingState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const [videoStatuses, setVideoStatuses] = useState<{[key: string]: any}>({});
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [allVideosComplete, setAllVideosComplete] = useState(false);
+  
+  // Refs to prevent infinite loops
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const statusCheckCountRef = useRef(0);
+  const renderCountRef = useRef(0);
+
+  // Track renders - keep logging for development
+  const currentRenderCount = ++renderCountRef.current;
+  
+  if (currentRenderCount % 100 === 0 || currentRenderCount < 10) {
+    console.log(`🔄 Component render #${currentRenderCount}`, {
+      isGenerating,
+      hasVideoData: !!videoData,
+      videoStatusesCount: Object.keys(videoStatuses).length,
+      isCheckingStatus,
+      allVideosComplete
+    });
+  }
 
   const generateVideo = useCallback(async () => {
+    console.log('🎬 Starting video generation...');
     setIsGenerating(true);
     setError(null);
-    setVideoError(null);
-    setGenerationStep('Analyzing content with AI...');
 
     try {
       const response = await fetch('/api/video-openai', {
@@ -78,151 +96,171 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
       }
 
       const data = await response.json();
-      console.log("🎬 Video generated:", data.result.videoUrl);
-      setVideo(data.result);
-      setGenerationStep('');
-      setVideoLoadingState('idle');
+      console.log("🎬 Videos generation started:", data.result);
+      setVideoData(data.result);
+      
+      // Start checking status of all video jobs
+      if (data.result.videoJobs && data.result.videoJobs.length > 0) {
+        startStatusChecking(data.result.videoJobs);
+      }
     } catch (err) {
+      console.error('❌ Generation error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
-      setGenerationStep('');
     } finally {
       setIsGenerating(false);
     }
   }, [inputText, selectedStyle]);
 
-  const handleVideoError = (event: React.SyntheticEvent<HTMLVideoElement, Event>) => {
-    const video = event.currentTarget;
-    const error = video.error;
-    let errorMessage = 'Failed to load video. ';
-    
-    if (error) {
-      switch (error.code) {
-        case 1:
-          errorMessage += 'Video loading aborted.';
-          break;
-        case 2:
-          errorMessage += 'Network error occurred while loading video.';
-          break;
-        case 3:
-          errorMessage += 'Video decoding error.';
-          break;
-        case 4:
-          errorMessage += 'Video format not supported.';
-          break;
-        default:
-          errorMessage += `Unknown error (code: ${error.code}).`;
+  const checkVideoStatus = async (invocationArn: string) => {
+    try {
+      console.log(`🔍 Checking status for: ${invocationArn}`);
+      const response = await fetch('/api/video-openai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          action: 'check-status', 
+          invocationArn: invocationArn 
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to check status');
       }
+
+      const statusData = await response.json();
+      console.log(`✅ Status for ${invocationArn}:`, statusData.status);
+      
+      return statusData;
+    } catch (err) {
+      console.error('❌ Status check error:', err);
+      return { status: 'Error', error: err instanceof Error ? err.message : 'Unknown error' };
+    }
+  };
+
+  const startStatusChecking = useCallback((videoJobs: VideoJob[]) => {
+    console.log('🕐 Starting status checking for', videoJobs.length, 'jobs');
+    
+    // Clear any existing interval
+    if (intervalRef.current) {
+      console.log('🛑 Clearing existing interval');
+      clearInterval(intervalRef.current);
     }
     
-    console.error('Video error details:', {
-      error: error,
-      src: video.src,
-      networkState: video.networkState,
-      readyState: video.readyState
+    const checkAllStatuses = async () => {
+      statusCheckCountRef.current += 1;
+      console.log(`🔄 Status check #${statusCheckCountRef.current}`);
+      
+      setIsCheckingStatus(true);
+      
+      const newStatuses: {[key: string]: any} = {};
+      
+      for (const job of videoJobs) {
+        const status = await checkVideoStatus(job.invocationArn);
+        newStatuses[job.invocationArn] = {
+          ...status,
+          s3Url: status.s3Url,
+          shotId: job.shotId,
+          title: job.title
+        };
+      }
+      
+      console.log('📊 Updated statuses:', Object.values(newStatuses).map(s => s.status));
+      setVideoStatuses(newStatuses);
+      setIsCheckingStatus(false);
+      
+      // Check if all jobs are complete (Completed or Failed)
+      const incompleteJobs = Object.values(newStatuses).filter(
+        status => status.status === 'InProgress'
+      );
+      
+      const completedJobs = Object.values(newStatuses).filter(
+        status => status.status === 'Completed'
+      );
+      
+      const failedJobs = Object.values(newStatuses).filter(
+        status => status.status === 'Failed' || status.failureMessage
+      );
+      
+      console.log(`📈 Status Summary:`, {
+        total: Object.keys(newStatuses).length,
+        completed: completedJobs.length,
+        failed: failedJobs.length,
+        inProgress: incompleteJobs.length
+      });
+      
+      // Mark as all complete when no more jobs are in progress
+      if (incompleteJobs.length === 0 && Object.keys(newStatuses).length > 0) {
+        console.log('🎉 All jobs finished! Completed:', completedJobs.length, 'Failed:', failedJobs.length);
+        setAllVideosComplete(true);
+        
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+      }
+    };
+
+    // Check immediately
+    checkAllStatuses();
+    
+    // Then check every 15 seconds
+    intervalRef.current = setInterval(async () => {
+      if (!allVideosComplete) {
+        await checkAllStatuses();
+      }
+    }, 15000);
+    
+    // Cleanup after 10 minutes
+    setTimeout(() => {
+      if (intervalRef.current) {
+        console.log('⏰ 10-minute timeout reached, clearing interval');
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+        setAllVideosComplete(true);
+      }
+    }, 600000);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        console.log('🧹 Component unmounting, clearing interval');
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, []);
+
+  const getCompletedVideos = useCallback(() => {
+    if (!videoData || !videoData.videoJobs) return [];
+    
+    return videoData.videoJobs.map(job => {
+      const status = videoStatuses[job.invocationArn];
+      return {
+        ...job,
+        status: status?.status || 'InProgress',
+        s3Url: status?.status === 'Completed' ? status.s3Url : null,
+        error: status?.failureMessage || status?.error
+      };
     });
+  }, [videoData, videoStatuses]);
+
+  // Memoize completed videos to prevent recalculation on every render
+  const completedVideos = useMemo(() => getCompletedVideos(), [getCompletedVideos]);
+  const availableVideos = useMemo(() => 
+    completedVideos.filter(video => video.status === 'Completed' && video.s3Url),
+    [completedVideos]
+  );
+
+  // Show enhanced loading page until all videos are complete
+  if (isGenerating || (videoData && !allVideosComplete)) {
+    const completedCount = completedVideos.filter(v => v.status === 'Completed' && v.s3Url).length;
+    const failedCount = completedVideos.filter(v => v.status === 'Failed' || v.error).length;
+    const inProgressCount = completedVideos.filter(v => v.status === 'InProgress').length;
+    const totalCount = videoData?.totalShots || 0;
     
-    setVideoError(errorMessage);
-    setVideoLoadingState('error');
-    
-    // No automatic fallback - show error instead
-    console.error(`❌ Video failed to load: ${video.src}`);
-    console.error(`❌ Error details: ${errorMessage}`);
-  };
-
-  const handleVideoLoadStart = () => {
-    setVideoLoadingState('loading');
-    setVideoError(null);
-  };
-
-  const handleVideoLoadedData = () => {
-    setVideoLoadingState('loaded');
-  };
-
-  const handleVideoCanPlay = () => {
-    setVideoLoadingState('loaded');
-  };
-
-  // Removed tryNextVideoUrl function - no more fallback videos
-
-  useEffect(() => {
-    // Don't auto-generate, let user choose style first
-    // if (inputText.trim()) {
-    //   generateVideo();
-    // }
-  }, [inputText, generateVideo]);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPlaying && video && video.slides && video.slides.length > 0 && video.slides[currentSlide]) {
-      interval = setInterval(() => {
-        setProgress(prev => {
-          const slide = video.slides[currentSlide];
-          if (!slide || typeof slide.duration !== 'number') {
-            return prev;
-          }
-          
-          const newProgress = prev + 100 / (slide.duration * 10);
-          if (newProgress >= 100) {
-            if (currentSlide < video.slides.length - 1) {
-              setCurrentSlide(prev => prev + 1);
-              return 0;
-            } else {
-              setIsPlaying(false);
-              return 100;
-            }
-          }
-          return newProgress;
-        });
-      }, 100);
-    }
-    return () => clearInterval(interval);
-  }, [isPlaying, currentSlide, video]);
-
-  const playPause = () => {
-    if (video && video.slides && video.slides.length > 0 && currentSlide < video.slides.length) {
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const nextSlide = () => {
-    if (video && video.slides && video.slides.length > 0 && currentSlide < video.slides.length - 1) {
-      setCurrentSlide(currentSlide + 1);
-      setProgress(0);
-    }
-  };
-
-  const prevSlide = () => {
-    if (video && video.slides && video.slides.length > 0 && currentSlide > 0) {
-      setCurrentSlide(currentSlide - 1);
-      setProgress(0);
-    }
-  };
-
-  const goToSlide = (index: number) => {
-    setCurrentSlide(index);
-    setProgress(0);
-    setIsPlaying(false);
-  };
-
-  const getSlideTypeColor = (type: string) => {
-    switch (type) {
-      case 'title': return 'from-blue-600 to-purple-600';
-      case 'content': return 'from-green-600 to-blue-600';
-      case 'conclusion': return 'from-orange-600 to-red-600';
-      default: return 'from-gray-600 to-gray-800';
-    }
-  };
-
-  const getSlideTypeIcon = (type: string) => {
-    switch (type) {
-      case 'title': return 'fas fa-play-circle';
-      case 'content': return 'fas fa-info-circle';
-      case 'conclusion': return 'fas fa-flag-checkered';
-      default: return 'fas fa-circle';
-    }
-  };
-
-  if (isGenerating) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full text-center">
@@ -232,23 +270,107 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
               <i className="fas fa-video text-blue-500 text-xl"></i>
             </div>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Creating Your Video</h2>
-          <p className="text-gray-600 mb-4">
-            {generationStep || 'Using AI to analyze your content and generate an engaging video...'}
-          </p>
-          <div className="space-y-2 text-sm text-gray-500">
-            <div className="flex items-center justify-center gap-2">
-              <i className="fas fa-brain text-purple-500"></i>
-              <span>Analyzing content with Nova Pro AI</span>
-            </div>
-            <div className="flex items-center justify-center gap-2">
-              <i className="fas fa-film text-blue-500"></i>
-              <span>Generating dynamic visuals with Nova Reel</span>
-            </div>
-            <div className="flex items-center justify-center gap-2">
-              <i className="fas fa-magic text-green-500"></i>
-              <span>Creating YouTube-style engaging video</span>
-            </div>
+          
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">
+            {isGenerating ? 'Creating Your Videos' : 'Processing Your Videos'}
+          </h2>
+          
+          {isGenerating ? (
+            <>
+              <p className="text-gray-600 mb-4">
+                Using AI to analyze your content and generate multiple engaging videos...
+              </p>
+              <div className="space-y-2 text-sm text-gray-500">
+                <div className="flex items-center justify-center gap-2">
+                  <i className="fas fa-brain text-purple-500"></i>
+                  <span>Analyzing content with OpenAI</span>
+                </div>
+                <div className="flex items-center justify-center gap-2">
+                  <i className="fas fa-film text-blue-500"></i>
+                  <span>Generating videos with Nova Reel</span>
+                </div>
+                <div className="flex items-center justify-center gap-2">
+                  <i className="fas fa-magic text-green-500"></i>
+                  <span>Creating separate video for each scene</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-gray-600 mb-6">
+                Waiting for all 3 videos to complete generation...
+              </p>
+              
+              {/* Progress Bar */}
+              <div className="mb-6">
+                <div className="flex justify-between text-sm text-gray-600 mb-2">
+                  <span>Progress</span>
+                  <span>{completedCount } / 3</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div 
+                    className="bg-gradient-to-r from-blue-500 to-purple-500 h-3 rounded-full transition-all duration-500" 
+                    style={{ width: `${totalCount > 0 ? ((completedCount ) / 3) * 100 : 0}%` }}
+                  ></div>
+                </div>
+              </div>
+              
+              {/* Status Grid */}
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="text-2xl font-bold text-green-600">{completedCount}</div>
+                  <div className="text-sm text-green-700">✅ Completed</div>
+                </div>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <div className="text-2xl font-bold text-yellow-600">{inProgressCount}</div>
+                  <div className="text-sm text-yellow-700">⏳ In Progress</div>
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <div className="text-2xl font-bold text-red-600">{failedCount}</div>
+                  <div className="text-sm text-red-700">❌ Failed</div>
+                </div>
+              </div>
+              
+              {/* Video List */}
+              <div className="text-left max-h-40 overflow-y-auto bg-gray-50 rounded-lg p-3 mb-4">
+                <h4 className="font-semibold text-gray-700 mb-2">Video Status:</h4>
+                <div className="space-y-1 text-sm">
+                  {completedVideos.map((video, index) => (
+                    <div key={video.shotId} className="flex items-center justify-between">
+                      <span className="text-gray-600">{video.shotId}: {video.title}</span>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        video.status === 'Completed' && video.s3Url ? 'bg-green-100 text-green-700' :
+                        video.status === 'InProgress' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {video.status === 'Completed' && video.s3Url ? '✅ Ready' :
+                         video.status === 'InProgress' ? '⏳ Processing' : '❌ Failed'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="text-sm text-gray-500">
+                {isCheckingStatus ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
+                    <span>Checking video status...</span>
+                  </div>
+                ) : (
+                  <span>Next check in 15 seconds...</span>
+                )}
+              </div>
+            </>
+          )}
+          
+          <div className="mt-4">
+            <button
+              onClick={onBack}
+              className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
+            >
+              Cancel & Go Back
+            </button>
           </div>
         </div>
       </div>
@@ -260,7 +382,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full text-center">
           <div className="text-red-500 text-6xl mb-6">⚠️</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Error Generating Video</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Error Generating Videos</h2>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
             onClick={onBack}
@@ -273,14 +395,13 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
     );
   }
 
-  if (!video && !isGenerating) {
+  if (!videoData && !isGenerating) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-100 p-4">
         <div className="max-w-4xl mx-auto">
-          {/* Header */}
           <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-3xl font-bold text-gray-800">Create Your Video</h1>
+              <h1 className="text-3xl font-bold text-gray-800">Create Your Videos</h1>
               <button
                 onClick={onBack}
                 className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2"
@@ -291,11 +412,10 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
             
             <div className="text-center mb-6">
               <div className="text-6xl mb-4">🎬</div>
-              <h2 className="text-xl font-semibold text-gray-700 mb-2">Generate YouTube-Style Video</h2>
-              <p className="text-gray-600">Transform your text into an engaging, professional video with AI</p>
+              <h2 className="text-xl font-semibold text-gray-700 mb-2">Generate Multiple AI Videos</h2>
+              <p className="text-gray-600">Transform your text into multiple engaging videos - one for each scene</p>
             </div>
             
-            {/* Style Selector */}
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Choose Video Style:
@@ -328,12 +448,11 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
                 className="mt-6 w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-lg"
               >
                 <i className="fas fa-video"></i>
-                Generate {selectedStyle.charAt(0).toUpperCase() + selectedStyle.slice(1)} Video
+                Generate {selectedStyle.charAt(0).toUpperCase() + selectedStyle.slice(1)} Videos
               </button>
             </div>
           </div>
           
-          {/* Content Preview */}
           <div className="bg-white rounded-2xl shadow-2xl p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Your Content</h3>
             <div className="bg-gray-50 rounded-lg p-4 max-h-60 overflow-y-auto">
@@ -347,10 +466,8 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
     );
   }
 
-  // Check if we have a video (Nova Reel, OpenAI, or other video types) or slides
-  const isNovaReelVideo = (video?.type === 'nova_reel_video' || video?.type === 'openai_video' || video?.type === 'ai_generated_video') && video?.videoUrl;
-  const isSlidesPresentation = video?.type === 'slides_presentation';
-  const hasSlides = video?.slides && video.slides.length > 0;
+  // Get the first available video for single player display
+  const primaryVideo = availableVideos.length > 0 ? availableVideos[0] : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-100 p-4">
@@ -358,9 +475,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold text-gray-800">
-              {isNovaReelVideo ? 'AI Generated Video' : isSlidesPresentation ? 'Interactive Presentation' : 'Video Presentation'}
-            </h1>
+            <h1 className="text-3xl font-bold text-gray-800">AI Generated Video</h1>
             <button
               onClick={onBack}
               className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2"
@@ -370,223 +485,72 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
           </div>
           
           <div className="text-center">
-            <h2 className="text-xl font-semibold text-gray-700 mb-2">{video?.title}</h2>
-            {isNovaReelVideo ? (
-              <p className="text-gray-600">Duration: {video?.duration || 30} seconds • AI Generated Video</p>
-            ) : isSlidesPresentation ? (
-              <p className="text-gray-600">Duration: {Math.round(video?.duration || 0)} seconds • {video?.slides?.length || 0} slides • Interactive Presentation</p>
-            ) : (
-              <p className="text-gray-600">Duration: {Math.round(video?.totalDuration || 0)} seconds • {video?.slides?.length || 0} slides</p>
-            )}
+            <h2 className="text-xl font-semibold text-gray-700 mb-2">{videoData?.title}</h2>
+            <p className="text-gray-600">Duration: 6 seconds • AI Generated Video</p>
           </div>
-          
         </div>
 
-        {isNovaReelVideo ? (
-          /* Nova Reel Video Player */
-          <div className="max-w-4xl mx-auto">
-            <div className="bg-white rounded-2xl shadow-2xl p-6">
-              <div className="aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl mb-4 relative overflow-hidden">
-                {videoError ? (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-8">
-                    <div className="text-center">
-                      <i className="fas fa-exclamation-triangle text-6xl mb-4 text-red-400"></i>
-                      <h3 className="text-2xl font-bold mb-4">Video Error</h3>
-                      <p className="text-lg leading-relaxed mb-4">{videoError}</p>
-                      
-                      <div className="space-y-3">
-                        <div className="text-sm text-gray-300 mb-4">
-                          Video failed to load. Please try generating a new video.
-                        </div>
-                        
-                        <div className="flex gap-3 justify-center">
-                          <button
-                            onClick={generateVideo}
-                            className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                          >
-                            Generate New Video
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+        {/* Single Video Player */}
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-2xl p-6">
+            <div className="aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl mb-4 relative overflow-hidden">
+              {primaryVideo && primaryVideo.s3Url ? (
+                <video
+                  key={primaryVideo.s3Url}
+                  controls
+                  className="w-full h-full object-cover rounded-xl"
+                  onError={(e) => console.error(`❌ Video load error:`, e)}
+                  onLoadStart={() => console.log(`🎬 Video load started:`, primaryVideo.s3Url)}
+                  onCanPlay={() => console.log(`✅ Video can play`)}
+                  preload="metadata"
+                  crossOrigin="anonymous"
+                >
+                  <source src={primaryVideo.s3Url} type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
+              ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-8">
+                  <div className="text-center">
+                    <i className="fas fa-video text-6xl mb-4 text-blue-400"></i>
+                    <h3 className="text-2xl font-bold mb-4">Video Ready</h3>
+                    <p className="text-lg leading-relaxed">Your AI-generated video is ready to watch!</p>
                   </div>
-                ) : video.videoUrl ? (
-                  <>
-                    <video
-                      key={video.videoUrl}
-                      controls
-                      className="w-full h-full object-cover rounded-xl"
-                      onError={handleVideoError}
-                      onLoadStart={handleVideoLoadStart}
-                      onLoadedData={handleVideoLoadedData}
-                      onCanPlay={handleVideoCanPlay}
-                      preload="metadata"
-                      crossOrigin="anonymous"
-                    >
-                      <source src={video.videoUrl} type="video/mp4" />
-                      Your browser does not support the video tag.
-                    </video>
-                    
-                    {videoLoadingState === 'loading' && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                        <div className="text-center text-white">
-                          <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent mx-auto mb-2"></div>
-                          <p className="text-sm">Loading video...</p>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-8">
-                    <div className="text-center">
-                      <i className="fas fa-video text-6xl mb-4 text-blue-400"></i>
-                      <h3 className="text-2xl font-bold mb-4">Loading Video</h3>
-                      <p className="text-lg leading-relaxed">Please wait while your video is being generated...</p>
-                    </div>
-                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="text-center space-y-2">
+              <div className="flex items-center justify-center gap-4 text-sm text-gray-600">
+                <span className="flex items-center gap-1">
+                  <i className="fas fa-video text-blue-500"></i>
+                  Duration: 6s
+                </span>
+                {videoData?.style && (
+                  <span className="flex items-center gap-1">
+                    <i className="fas fa-palette text-purple-500"></i>
+                    Style: {videoData.style}
+                  </span>
                 )}
+                <span className="flex items-center gap-1">
+                  <i className="fas fa-expand text-green-500"></i>
+                  16:9 Aspect Ratio
+                </span>
+                <span className="flex items-center gap-1">
+                  <i className="fas fa-circle text-xs text-green-500"></i>
+                  Ready
+                </span>
               </div>
               
-              <div className="text-center space-y-2">
-                <div className="flex items-center justify-center gap-4 text-sm text-gray-600">
-                  <span className="flex items-center gap-1">
-                    <i className="fas fa-video text-blue-500"></i>
-                    Duration: {video.duration || 30}s
-                  </span>
-                  {video.style && (
-                    <span className="flex items-center gap-1">
-                      <i className="fas fa-palette text-purple-500"></i>
-                      Style: {video.style}
-                    </span>
-                  )}
-                  <span className="flex items-center gap-1">
-                    <i className="fas fa-expand text-green-500"></i>
-                    16:9 Aspect Ratio
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <i className={`fas fa-circle text-xs ${videoLoadingState === 'loaded' ? 'text-green-500' : videoLoadingState === 'loading' ? 'text-yellow-500' : videoLoadingState === 'error' ? 'text-red-500' : 'text-gray-400'}`}></i>
-                    {videoLoadingState === 'loaded' ? 'Loaded' : videoLoadingState === 'loading' ? 'Loading' : videoLoadingState === 'error' ? 'Error' : 'Ready'}
-                  </span>
-                </div>
-                
-                {/* Debug Information */}
-                <details className="text-left mt-4">
-                  <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">Debug Info</summary>
-                  <div className="mt-2 p-3 bg-gray-100 rounded text-xs text-gray-600 space-y-1">
-                    <div><strong>Current Video URL:</strong> {video.videoUrl}</div>
-                    <div><strong>Video Type:</strong> {video.type}</div>
-                    <div><strong>Loading State:</strong> {videoLoadingState}</div>
-                    <div><strong>Browser Support:</strong> {document.createElement('video').canPlayType('video/mp4') ? 'MP4 Supported' : 'MP4 Not Supported'}</div>
-                  </div>
-                </details>
-                
-                <p className="text-xs text-gray-500">
-                  Powered by Amazon Nova Pro & Nova Reel AI • YouTube-ready quality
-                </p>
-              </div>
+              <p className="text-xs text-gray-500">
+                Powered by Amazon Nova Pro & Nova Reel AI • YouTube-ready quality
+              </p>
             </div>
           </div>
-        ) : (
-          /* Slides-based Video Player */
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Video Player */}
-            <div className="lg:col-span-2">
-              <div className="bg-white rounded-2xl shadow-2xl p-6">
-                <div className="aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl mb-4 relative overflow-hidden">
-                  {hasSlides && video.slides[currentSlide] && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-8">
-                      <div className="text-center">
-                        <i className={`${getSlideTypeIcon(video.slides[currentSlide].type)} text-6xl mb-4 text-blue-400`}></i>
-                        <h3 className="text-3xl font-bold mb-4">{video.slides[currentSlide].title}</h3>
-                        <p className="text-lg leading-relaxed">{video.slides[currentSlide].content}</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Progress Bar */}
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-700">
-                    <div 
-                      className="h-full bg-blue-500 transition-all duration-100"
-                      style={{ width: `${progress}%` }}
-                    ></div>
-                  </div>
-                </div>
+        </div>
 
-                {/* Controls */}
-                <div className="flex items-center justify-center gap-4">
-                  <button
-                    onClick={prevSlide}
-                    disabled={currentSlide === 0}
-                    className="p-3 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <i className="fas fa-step-backward text-gray-700"></i>
-                  </button>
-                  
-                  <button
-                    onClick={playPause}
-                    className="p-4 rounded-full bg-blue-500 hover:bg-blue-600 text-white transition-colors"
-                  >
-                    <i className={`fas ${isPlaying ? 'fa-pause' : 'fa-play'} text-xl`}></i>
-                  </button>
-                  
-                  <button
-                    onClick={nextSlide}
-                    disabled={currentSlide === (video?.slides?.length || 1) - 1}
-                    className="p-3 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <i className="fas fa-step-forward text-gray-700"></i>
-                  </button>
-                </div>
-
-                {/* Slide Counter */}
-                <div className="text-center mt-4 text-gray-600">
-                  Slide {currentSlide + 1} of {video?.slides?.length || 0}
-                </div>
-              </div>
-            </div>
-
-            {/* Slide Navigation */}
-            <div className="bg-white rounded-2xl shadow-2xl p-6">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Slides</h3>
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {hasSlides && video.slides.map((slide, index) => (
-                  <button
-                    key={slide.id}
-                    onClick={() => goToSlide(index)}
-                    className={`w-full text-left p-3 rounded-lg transition-all duration-200 ${
-                      currentSlide === index
-                        ? 'bg-blue-100 border-2 border-blue-500'
-                        : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full bg-gradient-to-r ${getSlideTypeColor(slide.type)} flex items-center justify-center text-white text-sm font-bold`}>
-                        {index + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-gray-800 truncate">{slide.title}</div>
-                        <div className="text-sm text-gray-600 truncate">{slide.content.substring(0, 50)}...</div>
-                        <div className="text-xs text-gray-500">{slide.duration}s</div>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Transcript */}
-        <div className="bg-white rounded-2xl shadow-2xl p-6 mt-6">
-          <h3 className="text-xl font-bold text-gray-800 mb-4">
-            {isNovaReelVideo ? 'Source Text' : 'Transcript'}
-          </h3>
-          <div className="bg-gray-50 rounded-lg p-4 max-h-60 overflow-y-auto">
-            <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-              {video?.transcript}
-            </p>
-          </div>
-          {isNovaReelVideo && (
+        {/* Enhanced Video Breakdown */}
+        {primaryVideo && primaryVideo.shot && (
+          <div className="bg-white rounded-2xl shadow-2xl p-6 mt-6">
             <div className="mt-4 space-y-3">
               <div className="p-3 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-700">
@@ -595,106 +559,110 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
                 </p>
               </div>
               
-              {video.shots && video.shots.length > 0 && (
-                <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4">
-                  <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                    <i className="fas fa-film text-purple-600"></i>
-                    Enhanced Video Breakdown
-                  </h4>
-                  
-                  {/* Content Analysis */}
-                  {video.content_analysis && (
-                    <div className="mb-4 bg-white rounded-lg p-3 shadow-sm">
-                      <h5 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                        <i className="fas fa-brain text-blue-500"></i>
-                        AI Content Analysis
-                      </h5>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <span className="font-medium text-gray-700">Key Themes:</span>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {video.content_analysis.key_themes?.map((theme, idx) => (
-                              <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
-                                {theme}
-                              </span>
-                            )) || []}
-                          </div>
+              <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4">
+                <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <i className="fas fa-film text-purple-600"></i>
+                  Enhanced Video Breakdown
+                </h4>
+                
+                {/* Content Analysis */}
+                {videoData?.content_analysis && (
+                  <div className="mb-4 bg-white rounded-lg p-3 shadow-sm">
+                    <h5 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                      <i className="fas fa-brain text-blue-500"></i>
+                      AI Content Analysis
+                    </h5>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="font-medium text-gray-700">Key Themes:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {videoData.content_analysis.key_themes?.map((theme, idx) => (
+                            <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                              {theme}
+                            </span>
+                          )) || []}
                         </div>
-                        <div>
-                          <span className="font-medium text-gray-700">Visual Metaphors:</span>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {video.content_analysis.visual_metaphors?.map((metaphor, idx) => (
-                              <span key={idx} className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">
-                                {metaphor}
-                              </span>
-                            )) || []}
-                          </div>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Visual Metaphors:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {videoData.content_analysis.visual_metaphors?.map((metaphor, idx) => (
+                            <span key={idx} className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">
+                              {metaphor}
+                            </span>
+                          )) || []}
                         </div>
-                        <div>
-                          <span className="font-medium text-gray-700">Target Audience:</span>
-                          <span className="ml-2 text-gray-600">{video.content_analysis.target_audience || 'Not specified'}</span>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-700">Emotional Tone:</span>
-                          <span className="ml-2 text-gray-600">{video.content_analysis.emotional_tone || 'Not specified'}</span>
-                        </div>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Target Audience:</span>
+                        <span className="ml-2 text-gray-600">{videoData.content_analysis.target_audience || 'Not specified'}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Emotional Tone:</span>
+                        <span className="ml-2 text-gray-600">{videoData.content_analysis.emotional_tone || 'Not specified'}</span>
                       </div>
                     </div>
-                  )}
-                  
-                  <div className="space-y-3">
-                    {video.shots.map((shot, index) => (
-                      <div key={index} className="bg-white rounded-lg p-4 shadow-sm">
-                        <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                            {index + 1}
+                  </div>
+                )}
+                
+                <div className="bg-white rounded-lg p-4 shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                      1
+                    </div>
+                    <div className="flex-1">
+                      <h5 className="font-medium text-gray-800 mb-2">{primaryVideo.shot.description || primaryVideo.title}</h5>
+                      <p className="text-sm text-gray-600 leading-relaxed mb-3">{primaryVideo.shot.prompt}</p>
+                      
+                      {/* Visual Details */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                        {primaryVideo.shot.background && (
+                          <div className="bg-gray-50 rounded p-2">
+                            <span className="font-medium text-gray-700">📍 Background:</span>
+                            <span className="ml-1 text-gray-600">{primaryVideo.shot.background}</span>
                           </div>
-                          <div className="flex-1">
-                            <h5 className="font-medium text-gray-800 mb-2">{shot.description}</h5>
-                            <p className="text-sm text-gray-600 leading-relaxed mb-3">{shot.prompt}</p>
-                            
-                            {/* Visual Details */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                              {shot.background && (
-                                <div className="bg-gray-50 rounded p-2">
-                                  <span className="font-medium text-gray-700">📍 Background:</span>
-                                  <span className="ml-1 text-gray-600">{shot.background}</span>
-                                </div>
-                              )}
-                              {shot.visual_elements && shot.visual_elements.length > 0 && (
-                                <div className="bg-gray-50 rounded p-2">
-                                  <span className="font-medium text-gray-700">🎨 Visual Elements:</span>
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {shot.visual_elements.map((element, idx) => (
-                                      <span key={idx} className="bg-green-100 text-green-800 px-1 py-0.5 rounded text-xs">
-                                        {element}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                              {shot.camera_movement && (
-                                <div className="bg-gray-50 rounded p-2">
-                                  <span className="font-medium text-gray-700">📹 Camera:</span>
-                                  <span className="ml-1 text-gray-600">{shot.camera_movement}</span>
-                                </div>
-                              )}
-                              {shot.lighting && (
-                                <div className="bg-gray-50 rounded p-2">
-                                  <span className="font-medium text-gray-700">💡 Lighting:</span>
-                                  <span className="ml-1 text-gray-600">{shot.lighting}</span>
-                                </div>
-                              )}
+                        )}
+                        {primaryVideo.shot.visual_elements && primaryVideo.shot.visual_elements.length > 0 && (
+                          <div className="bg-gray-50 rounded p-2">
+                            <span className="font-medium text-gray-700">🎨 Visual Elements:</span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {primaryVideo.shot.visual_elements.map((element, idx) => (
+                                <span key={idx} className="bg-green-100 text-green-800 px-1 py-0.5 rounded text-xs">
+                                  {element}
+                                </span>
+                              ))}
                             </div>
                           </div>
-                        </div>
+                        )}
+                        {primaryVideo.shot.camera_movement && (
+                          <div className="bg-gray-50 rounded p-2">
+                            <span className="font-medium text-gray-700">📹 Camera:</span>
+                            <span className="ml-1 text-gray-600">{primaryVideo.shot.camera_movement}</span>
+                          </div>
+                        )}
+                        {primaryVideo.shot.lighting && (
+                          <div className="bg-gray-50 rounded p-2">
+                            <span className="font-medium text-gray-700">💡 Lighting:</span>
+                            <span className="ml-1 text-gray-600">{primaryVideo.shot.lighting}</span>
+                          </div>
+                        )}
                       </div>
-                    ))}
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
-          )}
+          </div>
+        )}
+
+        {/* Source Text */}
+        <div className="bg-white rounded-2xl shadow-2xl p-6 mt-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Source Text</h3>
+          <div className="bg-gray-50 rounded-lg p-4 max-h-60 overflow-y-auto">
+            <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+              {videoData?.transcript}
+            </p>
+          </div>
         </div>
       </div>
     </div>

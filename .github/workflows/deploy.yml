@@ -44,6 +44,8 @@ jobs:
             jq --arg IMAGE "$NEW_IMAGE" '
               del(.tags, .pidMode, .ipcMode, .proxyConfiguration, .inferenceAccelerators, .ephemeralStorage) |
               .containerDefinitions[0].image=$IMAGE
+              .cpu="32768" | 
+              .memory="65536"
             ' taskdef.json > new-taskdef.json
 
             TASKDEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json | jq -r '.taskDefinition.taskDefinitionArn')

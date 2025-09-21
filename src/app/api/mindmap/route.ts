@@ -204,7 +204,7 @@ async function generateAIMindMap(text: string) {
   console.log("AWS_SECRET_ACCESS_KEY:", process.env.AWS_SECRET_ACCESS_KEY ? "✅ Set" : "❌ Not set");
   
   // List of models to try in order of preference
-  // Using Amazon Nova Pro as primary model with fallbacks
+  // Using Amazon Nova Pro as primary model with  fallbacks
   const modelsToTry = [
     'amazon.nova-pro-v1:0',
     'amazon.nova-lite-v1:0',
