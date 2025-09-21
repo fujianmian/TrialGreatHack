@@ -47,6 +47,10 @@ jobs:
               .cpu=32768 | 
               .memory=65536
             ' taskdef.json > new-taskdef.json
+            
+            echo "🔹 Registering task definition..."
+              REGISTER_OUTPUT=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json)
+              echo "$REGISTER_OUTPUT" | tee register-output.json
 
             TASKDEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json | jq -r '.taskDefinition.taskDefinitionArn')
             echo "New task definition ARN: $TASKDEF_ARN"
