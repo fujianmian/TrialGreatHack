@@ -24,7 +24,6 @@ interface Feature {
   title: string;
   description: string;
 }
-//trigger 
 
 const inputMethods: InputMethod[] = [
   { id: 'text', name: 'Text', icon: 'fas fa-font' },
@@ -62,9 +61,12 @@ const features: Feature[] = [
 export default function Home() {
   const [selectedInputMethod, setSelectedInputMethod] = useState('text');
   const [selectedOutputOption, setSelectedOutputOption] = useState<string>('');
-  const [inputText, setInputText] = useState('Quantum computing is an area of computing focused on developing computer technology based on the principles of quantum theory. Quantum computers use quantum bits or qubits, which can represent both 0 and 1 simultaneously, unlike classical bits. This allows quantum computers to perform certain calculations much faster than traditional computers.');
+  const [inputText, setInputText] = useState(
+    'Quantum computing is an area of computing focused on developing computer technology based on the principles of quantum theory. Quantum computers use quantum bits or qubits, which can represent both 0 and 1 simultaneously, unlike classical bits. This allows quantum computers to perform certain calculations much faster than traditional computers.'
+  );
   const [isGenerating, setIsGenerating] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [isRecommending, setIsRecommending] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showFlashcards, setShowFlashcards] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
@@ -75,12 +77,10 @@ export default function Home() {
   const [fileContent, setFileContent] = useState<string>('');
   const [difficultyLevel, setDifficultyLevel] = useState<string>('Beginner');
   const [recommendation, setRecommendation] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // New state for error handling
 
-  
-  // Ref for the main content section to scroll to
   const mainContentRef = useRef<HTMLDivElement>(null);
 
-  // Add Font Awesome to head
   useEffect(() => {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
@@ -92,7 +92,6 @@ export default function Home() {
     };
   }, []);
 
-  // Logger for mounting
   useEffect(() => {
     console.log('[Home] Mounted');
     return () => {
@@ -100,63 +99,146 @@ export default function Home() {
     };
   }, []);
 
-
   async function handleRecommendation() {
-    setLoading(true);
-    const res = await fetch("/api/recommend", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userInput: inputText }),
-    });
+    setIsRecommending(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch('/api/recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userInput: inputText }),
+      });
 
-    const data = await res.json();
-    // Highlight the recommended option
-    if (data.recommendation) {
-      const normalized = data.recommendation.toLowerCase().trim();
-      setSelectedOutputOption(normalized);
-      setRecommendation(normalized); // 👈 add this
+      const data = await res.json();
+      if (data.recommendation) {
+        const normalized = data.recommendation.toLowerCase().trim();
+        setSelectedOutputOption(normalized);
+        setRecommendation(normalized);
+      }
+    } catch (error) {
+      console.error('[Home] Error fetching recommendation:', error);
+      setErrorMessage('Failed to fetch recommendation. Please try again.');
     }
-    setLoading(false);
+    setIsRecommending(false);
   }
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+    if (file.size > maxSize) {
+      setErrorMessage('File size exceeds 10MB limit.');
+      return;
+    }
+
+    console.log('[Home] File uploaded:', file.name, 'type:', file.type);
+    setUploadedFile(file);
+    setErrorMessage(null); // Reset error message
+
+    try {
+      if (file.type === 'application/pdf') {
+        // Call the /api/extract endpoint for PDF files
+        const formData = new FormData();
+        formData.append('file', file);
+
+        setIsUploading(true);
+        const response = await fetch('/api/extract-pdf', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to process PDF');
+        }
+
+        // Use the processed content from Nova Pro if available, else fall back to raw extracted text
+        const extractedText = data.processedContent || data.extractedText || '';
+        console.log('[Home] PDF extracted text:', extractedText.slice(0, 100));
+
+        setFileContent(extractedText);
+        setInputText(extractedText); // Update the main input text for use in other components
+      } else if (file.type === 'text/plain' || file.type === 'text/csv') {
+        // Handle text-based files
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const content = e.target?.result as string;
+          console.log('[Home] FileReader loaded content:', content?.slice(0, 100));
+          setFileContent(content);
+          setInputText(content);
+        };
+        reader.readAsText(file);
+      } else if (file.type.includes('word') || file.type.includes('document')) {
+        // Placeholder for Word documents (replace with actual implementation if needed)
+        console.log('[Home] Word document upload not fully supported yet');
+        setFileContent('Word document uploaded successfully!');
+        setInputText('Word document uploaded successfully!');
+      } else {
+        throw new Error('Unsupported file type');
+      }
+    } catch (error) {
+      console.error('[Home] Error processing file:', error);
+      setErrorMessage('Failed to process the uploaded file. Please try again.');
+      setFileContent('');
+      setInputText('');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    console.log('[Home] Removing uploaded file');
+    setUploadedFile(null);
+    setFileContent('');
+    setInputText('');
+    setErrorMessage(null);
+  };
 
   const handleGenerate = () => {
     console.log('[Home] handleGenerate called. Output option:', selectedOutputOption);
-    // Reset all show states first
+    setErrorMessage(null); // Reset error message
     setShowFlashcards(false);
     setShowSummary(false);
     setShowMindMap(false);
     setShowVideo(false);
     setShowQuiz(false);
 
-    // Check if flashcards are selected
+    if (!selectedOutputOption) {
+      setErrorMessage('Please select an output option before generating.');
+      return;
+    }
+
+    if (!inputText.trim()) {
+      setErrorMessage('Please provide input content or upload a file.');
+      return;
+    }
+
     if (selectedOutputOption === 'flashcards') {
       console.log('[Home] Showing flashcards for input:', inputText);
       setShowFlashcards(true);
       return;
     }
 
-    // Check if summary is selected
     if (selectedOutputOption === 'summary') {
       console.log('[Home] Showing summary for input:', inputText);
       setShowSummary(true);
       return;
     }
 
-    // Check if mind map is selected
     if (selectedOutputOption === 'mindmap') {
       console.log('[Home] Showing mind map for input:', inputText);
       setShowMindMap(true);
       return;
     }
 
-    // Check if video is selected
     if (selectedOutputOption === 'video') {
       console.log('[Home] Showing video for input:', inputText);
       setShowVideo(true);
       return;
     }
 
-    // Check if quiz is selected
     if (selectedOutputOption === 'quiz') {
       console.log('[Home] Showing quiz for input:', inputText);
       setShowQuiz(true);
@@ -165,7 +247,6 @@ export default function Home() {
 
     setIsGenerating(true);
     console.log('[Home] Generating output for:', selectedOutputOption, 'with input:', inputText);
-    // Simulate loading delay with more realistic content
     setTimeout(() => {
       setIsGenerating(false);
       console.log('[Home] Generation finished');
@@ -192,70 +273,16 @@ export default function Home() {
     setShowQuiz(false);
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      console.log('[Home] File uploaded:', file.name, 'type:', file.type);
-      setUploadedFile(file);
-
-      // Read file content based on file type
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const content = e.target?.result as string;
-        console.log('[Home] FileReader loaded content:', content?.slice(0, 100));
-        setFileContent(content);
-        setInputText(content); // Update the main input text
-      };
-
-      if (file.type === 'text/plain' || file.type === 'text/csv') {
-        reader.readAsText(file);
-      } else if (file.type === 'application/pdf') {
-        // Define a placeholder function for extractPdfText
-                const text = await extractPdfText(file);
-        
-        async function extractPdfText(file: File): Promise<string> {
-          // Placeholder implementation for extracting text from a PDF
-          return "Extracted text from PDF (placeholder)";
-        }
-        console.log('[Home] PDF extracted text:', text?.slice(0, 100));
-        setFileContent(text);
-        setInputText(text);
-      } else if (file.type.includes('word') || file.type.includes('document')) {
-        const text = await extractWordText(file);
-
-        async function extractWordText(file: File): Promise<string> {
-          // Placeholder implementation for extracting text from a Word document
-          return "Extracted text from Word document (placeholder)";
-        }
-        console.log('[Home] Word extracted text:', text?.slice(0, 100));
-        setFileContent(text);
-        setInputText(text);
-      } else {
-        setFileContent('File uploaded successfully!');
-        setInputText('File uploaded successfully!');
-        console.log('[Home] Unknown file type, set generic content');
-      }
-    }
-  };
-
-  const handleRemoveFile = () => {
-    console.log('[Home] Removing uploaded file');
-    setUploadedFile(null);
-    setFileContent('');
-    setInputText('');
-  };
-
   const handleInputMethodChange = (methodId: string) => {
     console.log('[Home] Input method changed:', methodId);
     setSelectedInputMethod(methodId);
+    setErrorMessage(null);
 
-    // Reset file-related state when switching away from upload
     if (methodId !== 'upload') {
       setUploadedFile(null);
       setFileContent('');
     }
 
-    // Reset input text when switching to a new method (except upload)
     if (methodId !== 'upload' && methodId !== selectedInputMethod) {
       setInputText('');
     }
@@ -284,35 +311,45 @@ export default function Home() {
     }
   };
 
-  // Show flashcard component if flashcards are selected
+  // Conditional rendering for output components
   if (showFlashcards) {
-    return <TextToCard inputText={inputText} onBack={handleBackFromFlashcards} questionCount={getQuestionCount(difficultyLevel)} difficulty={difficultyLevel} />;
+    return (
+      <TextToCard
+        inputText={inputText}
+        onBack={handleBackFromFlashcards}
+        questionCount={getQuestionCount(difficultyLevel)}
+        difficulty={difficultyLevel}
+      />
+    );
   }
 
-  // Show summary component if summary is selected
   if (showSummary) {
     return <TextToSummary inputText={inputText} onBack={handleBackFromSummary} />;
   }
 
-  // Show mind map component if mind map is selected
   if (showMindMap) {
     return <TextToMap inputText={inputText} onBack={handleBackFromMindMap} />;
   }
 
-  // Show video component if video is selected
   if (showVideo) {
     return <TextToVideo inputText={inputText} onBack={handleBackFromVideo} />;
   }
 
-  // Show quiz component if quiz is selected
   if (showQuiz) {
-    return <TextToQuiz inputText={inputText} onBack={handleBackFromQuiz} questionCount={getQuestionCount(difficultyLevel)} difficulty={difficultyLevel} />;
+    return (
+      <TextToQuiz
+        inputText={inputText}
+        onBack={handleBackFromQuiz}
+        questionCount={getQuestionCount(difficultyLevel)}
+        difficulty={difficultyLevel}
+      />
+    );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 text-gray-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Enhanced Header */}
+        {/* Header */}
         <header className="flex justify-between items-center py-6 mb-10 bg-white/80 backdrop-blur-sm rounded-2xl px-8 shadow-lg border border-white/20">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl">
@@ -322,38 +359,52 @@ export default function Home() {
               EduAI
             </span>
           </div>
-          
-          {/* Desktop Navigation */}
           <nav className="hidden lg:block">
             <ul className="flex list-none gap-8">
-              <li><a href="#" className="text-gray-700 font-semibold hover:text-blue-600 transition-colors duration-300 relative group">
-                Home
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all duration-300 group-hover:w-full"></span>
-              </a></li>
-              <li><a href="#features" className="text-gray-700 font-semibold hover:text-blue-600 transition-colors duration-300 relative group">
-                Features
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all duration-300 group-hover:w-full"></span>
-              </a></li>
-              <li><a href="#how-it-works" className="text-gray-700 font-semibold hover:text-blue-600 transition-colors duration-300 relative group">
-                How It Works
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all duration-300 group-hover:w-full"></span>
-              </a></li>
-              <li><a href="#pricing" className="text-gray-700 font-semibold hover:text-blue-600 transition-colors duration-300 relative group">
-                Pricing
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all duration-300 group-hover:w-full"></span>
-              </a></li>
+              <li>
+                <a
+                  href="#"
+                  className="text-gray-700 font-semibold hover:text-blue-600 transition-colors duration-300 relative group"
+                >
+                  Home
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all duration-300 group-hover:w-full"></span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#features"
+                  className="text-gray-700 font-semibold hover:text-blue-600 transition-colors duration-300 relative group"
+                >
+                  Features
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all duration-300 group-hover:w-full"></span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#how-it-works"
+                  className="text-gray-700 font-semibold hover:text-blue-600 transition-colors duration-300 relative group"
+                >
+                  How It Works
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all duration-300 group-hover:w-full"></span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#pricing"
+                  className="text-gray-700 font-semibold hover:text-blue-600 transition-colors duration-300 relative group"
+                >
+                  Pricing
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all duration-300 group-hover:w-full"></span>
+                </a>
+              </li>
             </ul>
           </nav>
-          
-          {/* Mobile Menu Button */}
-          <button 
+          <button
             className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
             <i className={`fas ${isMenuOpen ? 'fa-times' : 'fa-bars'} text-xl text-gray-700`}></i>
           </button>
-          
-          {/* Desktop Auth Buttons */}
           <div className="hidden lg:flex gap-4">
             <button className="px-6 py-3 rounded-full border-2 border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 hover:border-blue-700 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
               Log In
@@ -368,10 +419,27 @@ export default function Home() {
         {isMenuOpen && (
           <div className="lg:hidden mb-6 bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
             <nav className="space-y-4">
-              <a href="#" className="block text-gray-700 font-semibold hover:text-blue-600 transition-colors py-2">Home</a>
-              <a href="#features" className="block text-gray-700 font-semibold hover:text-blue-600 transition-colors py-2">Features</a>
-              <a href="#how-it-works" className="block text-gray-700 font-semibold hover:text-blue-600 transition-colors py-2">How It Works</a>
-              <a href="#pricing" className="block text-gray-700 font-semibold hover:text-blue-600 transition-colors py-2">Pricing</a>
+              <a href="#" className="block text-gray-700 font-semibold hover:text-blue-600 transition-colors py-2">
+                Home
+              </a>
+              <a
+                href="#features"
+                className="block text-gray-700 font-semibold hover:text-blue-600 transition-colors py-2"
+              >
+                Features
+              </a>
+              <a
+                href="#how-it-works"
+                className="block text-gray-700 font-semibold hover:text-blue-600 transition-colors py-2"
+              >
+                How It Works
+              </a>
+              <a
+                href="#pricing"
+                className="block text-gray-700 font-semibold hover:text-blue-600 transition-colors py-2"
+              >
+                Pricing
+              </a>
             </nav>
             <div className="flex gap-3 mt-6">
               <button className="flex-1 px-4 py-3 rounded-full border-2 border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition-all">
@@ -383,8 +451,8 @@ export default function Home() {
             </div>
           </div>
         )}
-        
-        {/* Enhanced Hero Section */}
+
+        {/* Hero Section */}
         <section className="text-center py-16 mb-12">
           <div className="max-w-4xl mx-auto">
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent leading-tight">
@@ -394,7 +462,7 @@ export default function Home() {
               Generate educational videos, detailed notes, flashcards, and more from any content with our powerful AI assistant.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button 
+              <button
                 onClick={scrollToMainContent}
                 className="px-10 py-4 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-semibold text-lg hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
               >
@@ -408,8 +476,8 @@ export default function Home() {
             </div>
           </div>
         </section>
-        
-        {/* Enhanced Main Content */}
+
+        {/* Main Content */}
         <div ref={mainContentRef} className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-16">
           {/* Input Section */}
           <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20 hover:shadow-2xl transition-all duration-300">
@@ -419,7 +487,7 @@ export default function Home() {
               </div>
               Input Your Content
             </h2>
-            
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               {inputMethods.map((method) => (
                 <div
@@ -436,7 +504,7 @@ export default function Home() {
                 </div>
               ))}
             </div>
-            
+
             <div className="mb-6">
               {selectedInputMethod === 'upload' ? (
                 <div className="w-full min-h-48 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center hover:border-blue-400 hover:bg-blue-50 transition-all duration-300 p-4">
@@ -462,10 +530,7 @@ export default function Home() {
                         {fileContent && (
                           <div className="mt-4 p-3 bg-gray-50 rounded-lg max-h-32 overflow-y-auto">
                             <p className="text-sm text-gray-700 text-left">
-                              {fileContent.length > 200 
-                                ? fileContent.substring(0, 200) + '...' 
-                                : fileContent
-                              }
+                              {fileContent.length > 200 ? fileContent.substring(0, 200) + '...' : fileContent}
                             </p>
                           </div>
                         )}
@@ -488,8 +553,15 @@ export default function Home() {
                           accept=".txt,.pdf,.doc,.docx"
                           onChange={handleFileUpload}
                           className="hidden"
+                          disabled={isUploading}
                         />
                       </label>
+                      {isUploading && (
+                        <p className="mt-2 text-sm text-blue-600 flex items-center justify-center">
+                          <i className="fas fa-spinner fa-spin mr-1"></i>
+                          Processing file...
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -499,18 +571,21 @@ export default function Home() {
                   onChange={(e) => setInputText(e.target.value)}
                   className="w-full h-40 p-4 border-2 border-gray-200 rounded-xl resize-y text-base focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all duration-300"
                   placeholder={
-                    selectedInputMethod === 'text' 
-                      ? "Paste your text, article, or any content you want to learn from..."
+                    selectedInputMethod === 'text'
+                      ? 'Paste your text, article, or any content you want to learn from...'
                       : selectedInputMethod === 'url'
-                      ? "Enter a URL to extract content from..."
+                      ? 'Enter a URL to extract content from...'
                       : selectedInputMethod === 'voice'
-                      ? "Click the microphone to start voice input..."
-                      : "Paste your text, article, or any content you want to learn from..."
+                      ? 'Click the microphone to start voice input...'
+                      : 'Paste your text, article, or any content you want to learn from...'
                   }
                 />
               )}
+              {errorMessage && (
+                <p className="mt-2 text-sm text-red-600">{errorMessage}</p>
+              )}
             </div>
-            
+
             <div className="bg-gray-50 rounded-xl p-4">
               <h3 className="text-lg font-semibold mb-3 text-gray-700 flex items-center gap-2">
                 <i className="fas fa-cog text-blue-600"></i>
@@ -519,7 +594,7 @@ export default function Home() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2">Difficulty Level</label>
-                  <select 
+                  <select
                     value={difficultyLevel}
                     onChange={(e) => setDifficultyLevel(e.target.value)}
                     className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
@@ -541,7 +616,7 @@ export default function Home() {
               </div>
             </div>
           </div>
-          
+
           {/* Output Section */}
           <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20 hover:shadow-2xl transition-all duration-300">
             <h2 className="text-2xl md:text-3xl mb-6 text-blue-600 flex items-center gap-3 font-bold">
@@ -550,7 +625,7 @@ export default function Home() {
               </div>
               Choose Output
             </h2>
-            
+
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
               {outputOptions.map((option) => (
                 <div
@@ -571,20 +646,19 @@ export default function Home() {
             <div className="text-center">
               <button
                 onClick={handleRecommendation}
-                disabled={loading}
+                disabled={isRecommending}
                 className="px-12 py-4 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-semibold text-lg hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
-                <i className={`fas ${loading ? 'fa-spinner fa-spin' : 'fa-bolt'} mr-3`}></i>
-                {loading ? 'Analyzing...' : 'Don’t know which to pick? Click here!'}
+                <i className={`fas ${isRecommending ? 'fa-spinner fa-spin' : 'fa-bolt'} mr-3`}></i>
+                {isRecommending ? 'Analyzing...' : 'Don’t know which to pick? Click here!'}
               </button>
-              {!loading && recommendation && (
+              {!isRecommending && recommendation && (
                 <p className="mt-2 text-sm text-gray-500 text-center">
                   We recommend: <strong className="text-blue-600">{recommendation}</strong>
                 </p>
               )}
             </div>
-            
-            
+
             <div className="bg-gray-50 rounded-xl p-4 mb-6">
               <h3 className="text-lg font-semibold mb-3 text-gray-700 flex items-center gap-2">
                 <i className="fas fa-sliders-h text-blue-600"></i>
@@ -601,28 +675,33 @@ export default function Home() {
                 </div>
                 <div>
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
                     <span className="text-sm font-medium text-gray-600">Include examples</span>
                   </label>
                 </div>
               </div>
             </div>
-            
+
             <div className="text-center">
               <button
                 onClick={handleGenerate}
-                disabled={isGenerating}
+                disabled={isGenerating || isRecommending}
                 className="px-12 py-4 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-semibold text-lg hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 <i className={`fas ${isGenerating ? 'fa-spinner fa-spin' : 'fa-bolt'} mr-3`}></i>
                 {isGenerating ? 'Generating...' : 'Generate Content'}
               </button>
+              {errorMessage && (
+                <p className="mt-2 text-sm text-red-600">{errorMessage}</p>
+              )}
             </div>
           </div>
         </div>
-        
-        
-        {/* Enhanced Features Section */}
+
+        {/* Features Section */}
         <section id="features" className="mb-20">
           <h2 className="text-center text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
             Why Choose EduAI?
@@ -630,10 +709,13 @@ export default function Home() {
           <p className="text-center text-xl text-gray-600 mb-16 max-w-3xl mx-auto">
             Experience the future of learning with our cutting-edge AI technology
           </p>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <div key={index} className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 text-center shadow-xl border border-white/20 hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 group">
+              <div
+                key={index}
+                className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 text-center shadow-xl border border-white/20 hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 group"
+              >
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl mb-6 group-hover:scale-110 transition-transform duration-300">
                   <i className={`${feature.icon} text-2xl text-white`}></i>
                 </div>
@@ -643,63 +725,95 @@ export default function Home() {
             ))}
           </div>
         </section>
-      </div>
-      
-      {/* Enhanced Footer */}
-      <footer className="bg-white/80 backdrop-blur-sm border-t border-gray-200 mt-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="col-span-1 md:col-span-2">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl">
-                  <i className="fas fa-graduation-cap text-xl text-white"></i>
+
+        {/* Footer */}
+        <footer className="bg-white/80 backdrop-blur-sm border-t border-gray-200 mt-20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+              <div className="col-span-1 md:col-span-2">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl">
+                    <i className="fas fa-graduation-cap text-xl text-white"></i>
+                  </div>
+                  <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                    EduAI
+                  </span>
                 </div>
-                <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                  EduAI
-                </span>
+                <p className="text-gray-600 mb-4 max-w-md">
+                  AI-powered learning assistant for the modern student. Transform any content into engaging educational materials.
+                </p>
+                <div className="flex gap-4">
+                  <a href="#" className="text-gray-400 hover:text-blue-600 transition-colors">
+                    <i className="fab fa-twitter text-xl"></i>
+                  </a>
+                  <a href="#" className="text-gray-400 hover:text-blue-600 transition-colors">
+                    <i className="fab fa-linkedin text-xl"></i>
+                  </a>
+                  <a href="#" className="text-gray-400 hover:text-blue-600 transition-colors">
+                    <i className="fab fa-github text-xl"></i>
+                  </a>
+                </div>
               </div>
-              <p className="text-gray-600 mb-4 max-w-md">
-                AI-powered learning assistant for the modern student. Transform any content into engaging educational materials.
-              </p>
-              <div className="flex gap-4">
-                <a href="#" className="text-gray-400 hover:text-blue-600 transition-colors">
-                  <i className="fab fa-twitter text-xl"></i>
-                </a>
-                <a href="#" className="text-gray-400 hover:text-blue-600 transition-colors">
-                  <i className="fab fa-linkedin text-xl"></i>
-                </a>
-                <a href="#" className="text-gray-400 hover:text-blue-600 transition-colors">
-                  <i className="fab fa-github text-xl"></i>
-                </a>
+
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Product</h3>
+                <ul className="space-y-2">
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">
+                      Features
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">
+                      Pricing
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">
+                      API
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">
+                      Integrations
+                    </a>
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Support</h3>
+                <ul className="space-y-2">
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">
+                      Help Center
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">
+                      Contact Us
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">
+                      Status
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">
+                      Community
+                    </a>
+                  </li>
+                </ul>
               </div>
             </div>
-            
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Product</h3>
-              <ul className="space-y-2">
-                <li><a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">Features</a></li>
-                <li><a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">Pricing</a></li>
-                <li><a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">API</a></li>
-                <li><a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">Integrations</a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Support</h3>
-              <ul className="space-y-2">
-                <li><a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">Help Center</a></li>
-                <li><a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">Contact Us</a></li>
-                <li><a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">Status</a></li>
-                <li><a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">Community</a></li>
-              </ul>
+
+            <div className="border-t border-gray-200 mt-8 pt-8 text-center">
+              <p className="text-gray-600">© 2025 EduAI. All rights reserved.</p>
             </div>
           </div>
-          
-          <div className="border-t border-gray-200 mt-8 pt-8 text-center">
-            <p className="text-gray-600">© 2025 EduAI. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
+        </footer>
+      </div>
     </div>
   );
 }
