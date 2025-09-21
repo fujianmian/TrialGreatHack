@@ -27,23 +27,6 @@ interface ContentAnalysis {
   emotional_tone: string;
 }
 
-interface BackgroundImage {
-  description: string;
-  visual_elements: string[];
-  lighting: string;
-  colors: string;
-}
-
-interface OpenAIAnalysis {
-  themes: string[];
-  backgrounds: BackgroundImage[];
-  visual_metaphors: string[];
-  target_audience: string;
-  emotional_tone: string;
-  color_palette: string;
-  style_recommendations: string;
-}
-
 interface VideoResponse {
   title: string;
   slides: VideoSlide[];
@@ -56,9 +39,6 @@ interface VideoResponse {
   style?: string;
   shots?: VideoShot[];
   content_analysis?: ContentAnalysis;
-  // OpenAI enhanced fields
-  openai_analysis?: OpenAIAnalysis;
-  background_images?: BackgroundImage[];
 }
 
 interface TextToVideoProps {
@@ -76,6 +56,9 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
   const [videoError, setVideoError] = useState<string | null>(null);
   const [generationStep, setGenerationStep] = useState<string>('');
   const [selectedStyle, setSelectedStyle] = useState<string>('educational');
+  const [videoLoadingState, setVideoLoadingState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const [fallbackVideoUrls, setFallbackVideoUrls] = useState<string[]>([]);
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
 
   const generateVideo = useCallback(async () => {
     setIsGenerating(true);
@@ -97,8 +80,21 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
       }
 
       const data = await response.json();
+      console.log("🎬 Video generated:", data.result.videoUrl);
       setVideo(data.result);
       setGenerationStep('');
+      setVideoLoadingState('idle');
+      setCurrentVideoIndex(0);
+      
+      // Set up fallback video URLs (removed BigBuckBunny as first fallback)
+      const fallbackUrls = [
+        data.result.videoUrl,
+        "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+        "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+        "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4"
+      ].filter(url => url); // Remove any undefined URLs
+      
+      setFallbackVideoUrls(fallbackUrls);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       setGenerationStep('');
@@ -107,8 +103,77 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
     }
   }, [inputText, selectedStyle]);
 
-  const handleVideoError = () => {
-    setVideoError('Failed to load video. Please try again.');
+  const handleVideoError = (event: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    const video = event.currentTarget;
+    const error = video.error;
+    let errorMessage = 'Failed to load video. ';
+    
+    if (error) {
+      switch (error.code) {
+        case 1:
+          errorMessage += 'Video loading aborted.';
+          break;
+        case 2:
+          errorMessage += 'Network error occurred while loading video.';
+          break;
+        case 3:
+          errorMessage += 'Video decoding error.';
+          break;
+        case 4:
+          errorMessage += 'Video format not supported.';
+          break;
+        default:
+          errorMessage += `Unknown error (code: ${error.code}).`;
+      }
+    }
+    
+    console.error('Video error details:', {
+      error: error,
+      src: video.src,
+      networkState: video.networkState,
+      readyState: video.readyState
+    });
+    
+    setVideoError(errorMessage);
+    setVideoLoadingState('error');
+    
+    // Automatically try next video URL if available
+    setTimeout(() => {
+      if (currentVideoIndex < fallbackVideoUrls.length - 1) {
+        console.log(`🔄 Video failed to load, trying fallback ${currentVideoIndex + 1}: ${fallbackVideoUrls[currentVideoIndex + 1]}`);
+        tryNextVideoUrl();
+      }
+    }, 1000);
+  };
+
+  const handleVideoLoadStart = () => {
+    setVideoLoadingState('loading');
+    setVideoError(null);
+  };
+
+  const handleVideoLoadedData = () => {
+    setVideoLoadingState('loaded');
+  };
+
+  const handleVideoCanPlay = () => {
+    setVideoLoadingState('loaded');
+  };
+
+  const tryNextVideoUrl = () => {
+    if (currentVideoIndex < fallbackVideoUrls.length - 1) {
+      const nextIndex = currentVideoIndex + 1;
+      setCurrentVideoIndex(nextIndex);
+      setVideoError(null);
+      setVideoLoadingState('idle');
+      
+      // Update the video URL in the video object
+      if (video) {
+        setVideo({
+          ...video,
+          videoUrl: fallbackVideoUrls[nextIndex]
+        });
+      }
+    }
   };
 
   useEffect(() => {
@@ -309,8 +374,8 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
     );
   }
 
-  // Check if we have a Nova Reel video or slides
-  const isNovaReelVideo = video?.type === 'nova_reel_video' && video?.videoUrl;
+  // Check if we have a video (Nova Reel, OpenAI, or other video types) or slides
+  const isNovaReelVideo = (video?.type === 'nova_reel_video' || video?.type === 'openai_video') && video?.videoUrl;
   const hasSlides = video?.slides && video.slides.length > 0;
 
   return (
@@ -331,11 +396,11 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
           </div>
           
           <div className="text-center">
-            <h2 className="text-xl font-semibold text-gray-700 mb-2">{video.title}</h2>
+            <h2 className="text-xl font-semibold text-gray-700 mb-2">{video?.title}</h2>
             {isNovaReelVideo ? (
-              <p className="text-gray-600">Duration: {video.duration || 30} seconds • AI Generated Video</p>
+              <p className="text-gray-600">Duration: {video?.duration || 30} seconds • AI Generated Video</p>
             ) : (
-              <p className="text-gray-600">Duration: {Math.round(video.totalDuration)} seconds • {video.slides.length} slides</p>
+              <p className="text-gray-600">Duration: {Math.round(video?.totalDuration || 0)} seconds • {video?.slides?.length || 0} slides</p>
             )}
           </div>
           
@@ -351,29 +416,73 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
                     <div className="text-center">
                       <i className="fas fa-exclamation-triangle text-6xl mb-4 text-red-400"></i>
                       <h3 className="text-2xl font-bold mb-4">Video Error</h3>
-                      <p className="text-lg leading-relaxed">{videoError}</p>
-                      <button
-                        onClick={() => {
-                          setVideoError(null);
-                          generateVideo();
-                        }}
-                        className="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                      >
-                        Try Again
-                      </button>
+                      <p className="text-lg leading-relaxed mb-4">{videoError}</p>
+                      
+                      <div className="space-y-3">
+                        {currentVideoIndex < fallbackVideoUrls.length - 1 ? (
+                          <div className="text-sm text-gray-300 mb-4">
+                            Trying fallback video {currentVideoIndex + 2} of {fallbackVideoUrls.length}...
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-300 mb-4">
+                            All video sources failed. Please try again.
+                          </div>
+                        )}
+                        
+                        <div className="flex gap-3 justify-center">
+                          <button
+                            onClick={() => {
+                              setVideoError(null);
+                              setVideoLoadingState('idle');
+                              setCurrentVideoIndex(0);
+                              if (video) {
+                                setVideo({
+                                  ...video,
+                                  videoUrl: fallbackVideoUrls[0]
+                                });
+                              }
+                            }}
+                            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                          >
+                            Retry Current Video
+                          </button>
+                          
+                          <button
+                            onClick={generateVideo}
+                            className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                          >
+                            Generate New Video
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ) : video.videoUrl ? (
-                  <video
-                    key={video.videoUrl}
-                    controls
-                    className="w-full h-full object-cover rounded-xl"
-                    onError={handleVideoError}
-                    preload="metadata"
-                  >
-                    <source src={video.videoUrl} type="video/mp4" />
-                    Your browser does not support the video tag.
-                  </video>
+                  <>
+                    <video
+                      key={video.videoUrl}
+                      controls
+                      className="w-full h-full object-cover rounded-xl"
+                      onError={handleVideoError}
+                      onLoadStart={handleVideoLoadStart}
+                      onLoadedData={handleVideoLoadedData}
+                      onCanPlay={handleVideoCanPlay}
+                      preload="metadata"
+                      crossOrigin="anonymous"
+                    >
+                      <source src={video.videoUrl} type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
+                    
+                    {videoLoadingState === 'loading' && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                        <div className="text-center text-white">
+                          <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent mx-auto mb-2"></div>
+                          <p className="text-sm">Loading video...</p>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-8">
                     <div className="text-center">
@@ -401,7 +510,25 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
                     <i className="fas fa-expand text-green-500"></i>
                     16:9 Aspect Ratio
                   </span>
+                  <span className="flex items-center gap-1">
+                    <i className={`fas fa-circle text-xs ${videoLoadingState === 'loaded' ? 'text-green-500' : videoLoadingState === 'loading' ? 'text-yellow-500' : videoLoadingState === 'error' ? 'text-red-500' : 'text-gray-400'}`}></i>
+                    {videoLoadingState === 'loaded' ? 'Loaded' : videoLoadingState === 'loading' ? 'Loading' : videoLoadingState === 'error' ? 'Error' : 'Ready'}
+                  </span>
                 </div>
+                
+                {/* Debug Information */}
+                <details className="text-left mt-4">
+                  <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">Debug Info</summary>
+                  <div className="mt-2 p-3 bg-gray-100 rounded text-xs text-gray-600 space-y-1">
+                    <div><strong>Current Video URL:</strong> {video.videoUrl}</div>
+                    <div><strong>Video Index:</strong> {currentVideoIndex + 1} of {fallbackVideoUrls.length}</div>
+                    <div><strong>Video Type:</strong> {video.type}</div>
+                    <div><strong>Loading State:</strong> {videoLoadingState}</div>
+                    <div><strong>Browser Support:</strong> {document.createElement('video').canPlayType('video/mp4') ? 'MP4 Supported' : 'MP4 Not Supported'}</div>
+                    <div><strong>Fallback URLs:</strong> {fallbackVideoUrls.length} available</div>
+                  </div>
+                </details>
+                
                 <p className="text-xs text-gray-500">
                   Powered by Amazon Nova Pro & Nova Reel AI • YouTube-ready quality
                 </p>
@@ -453,7 +580,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
                   
                   <button
                     onClick={nextSlide}
-                    disabled={currentSlide === (video.slides?.length || 1) - 1}
+                    disabled={currentSlide === (video?.slides?.length || 1) - 1}
                     className="p-3 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <i className="fas fa-step-forward text-gray-700"></i>
@@ -462,7 +589,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
 
                 {/* Slide Counter */}
                 <div className="text-center mt-4 text-gray-600">
-                  Slide {currentSlide + 1} of {video.slides?.length || 0}
+                  Slide {currentSlide + 1} of {video?.slides?.length || 0}
                 </div>
               </div>
             </div>
@@ -505,7 +632,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
           </h3>
           <div className="bg-gray-50 rounded-lg p-4 max-h-60 overflow-y-auto">
             <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-              {video.transcript}
+              {video?.transcript}
             </p>
           </div>
           {isNovaReelVideo && (
@@ -513,7 +640,7 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
               <div className="p-3 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-700">
                   <i className="fas fa-info-circle mr-2"></i>
-                  This video was generated using advanced AI analysis. OpenAI analyzes your content to suggest specific backgrounds, visual elements, and scenes. The system then creates dynamic videos with contextual environments, relevant props, and professional cinematography - making each video unique and engaging rather than generic.
+                  This video was generated using advanced AI analysis. Nova Pro analyzes your content to suggest specific backgrounds, visual elements, and scenes. Nova Reel then creates dynamic videos with contextual environments, relevant props, and professional cinematography - making each video unique and engaging rather than generic.
                 </p>
               </div>
               
@@ -524,101 +651,8 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
                     Enhanced Video Breakdown
                   </h4>
                   
-                  {/* OpenAI Enhanced Analysis */}
-                  {video.openai_analysis && (
-                    <div className="mb-4 bg-white rounded-lg p-3 shadow-sm">
-                      <h5 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                        <i className="fas fa-magic text-green-500"></i>
-                        OpenAI Enhanced Analysis
-                      </h5>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <span className="font-medium text-gray-700">Themes:</span>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {video.openai_analysis.themes.map((theme, idx) => (
-                              <span key={idx} className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
-                                {theme}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-700">Visual Metaphors:</span>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {video.openai_analysis.visual_metaphors.map((metaphor, idx) => (
-                              <span key={idx} className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">
-                                {metaphor}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-700">Target Audience:</span>
-                          <span className="ml-2 text-gray-600">{video.openai_analysis.target_audience}</span>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-700">Emotional Tone:</span>
-                          <span className="ml-2 text-gray-600">{video.openai_analysis.emotional_tone}</span>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-700">Color Palette:</span>
-                          <span className="ml-2 text-gray-600">{video.openai_analysis.color_palette}</span>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-700">Style:</span>
-                          <span className="ml-2 text-gray-600">{video.openai_analysis.style_recommendations}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Background Images Section */}
-                  {video.background_images && video.background_images.length > 0 && (
-                    <div className="mb-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4">
-                      <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                        <i className="fas fa-image text-green-600"></i>
-                        AI-Generated Background Suggestions
-                      </h5>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {video.background_images.map((bg, index) => (
-                          <div key={index} className="bg-white rounded-lg p-3 shadow-sm">
-                            <div className="flex items-start gap-3">
-                              <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                                {index + 1}
-                              </div>
-                              <div className="flex-1">
-                                <h6 className="font-medium text-gray-800 mb-1">Background {index + 1}</h6>
-                                <p className="text-sm text-gray-600 mb-2">{bg.description}</p>
-                                <div className="space-y-1">
-                                  <div>
-                                    <span className="text-xs font-medium text-gray-700">🎨 Visual Elements:</span>
-                                    <div className="flex flex-wrap gap-1 mt-1">
-                                      {bg.visual_elements.map((element, idx) => (
-                                        <span key={idx} className="bg-blue-100 text-blue-800 px-1 py-0.5 rounded text-xs">
-                                          {element}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                  <div className="text-xs">
-                                    <span className="font-medium text-gray-700">💡 Lighting:</span>
-                                    <span className="ml-1 text-gray-600">{bg.lighting}</span>
-                                  </div>
-                                  <div className="text-xs">
-                                    <span className="font-medium text-gray-700">🎨 Colors:</span>
-                                    <span className="ml-1 text-gray-600">{bg.colors}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Fallback Content Analysis */}
-                  {!video.openai_analysis && video.content_analysis && (
+                  {/* Content Analysis */}
+                  {video.content_analysis && (
                     <div className="mb-4 bg-white rounded-lg p-3 shadow-sm">
                       <h5 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
                         <i className="fas fa-brain text-blue-500"></i>
@@ -628,30 +662,30 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
                         <div>
                           <span className="font-medium text-gray-700">Key Themes:</span>
                           <div className="flex flex-wrap gap-1 mt-1">
-                            {video.content_analysis.key_themes.map((theme, idx) => (
+                            {video.content_analysis.key_themes?.map((theme, idx) => (
                               <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
                                 {theme}
                               </span>
-                            ))}
+                            )) || []}
                           </div>
                         </div>
                         <div>
                           <span className="font-medium text-gray-700">Visual Metaphors:</span>
                           <div className="flex flex-wrap gap-1 mt-1">
-                            {video.content_analysis.visual_metaphors.map((metaphor, idx) => (
+                            {video.content_analysis.visual_metaphors?.map((metaphor, idx) => (
                               <span key={idx} className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">
                                 {metaphor}
                               </span>
-                            ))}
+                            )) || []}
                           </div>
                         </div>
                         <div>
                           <span className="font-medium text-gray-700">Target Audience:</span>
-                          <span className="ml-2 text-gray-600">{video.content_analysis.target_audience}</span>
+                          <span className="ml-2 text-gray-600">{video.content_analysis.target_audience || 'Not specified'}</span>
                         </div>
                         <div>
                           <span className="font-medium text-gray-700">Emotional Tone:</span>
-                          <span className="ml-2 text-gray-600">{video.content_analysis.emotional_tone}</span>
+                          <span className="ml-2 text-gray-600">{video.content_analysis.emotional_tone || 'Not specified'}</span>
                         </div>
                       </div>
                     </div>
