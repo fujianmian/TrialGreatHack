@@ -22,16 +22,16 @@ jobs:
 
       - name: Login to Amazon ECR
         run: |
-          aws ecr get-login-password --region ap-southeast-5 | docker login --username AWS --password-stdin 268060978153.dkr.ecr.ap-southeast-5.amazonaws.com
+          aws ecr get-login-password --region ap-southeast-5 | docker login --username AWS --password-stdin 242038040781.dkr.ecr.ap-southeast-5.amazonaws.com
 
       - name: Build Docker image
         run: |
           docker build --no-cache -t myapp:${{ github.sha }} .
-          docker tag myapp:${{ github.sha }} 268060978153.dkr.ecr.ap-southeast-5.amazonaws.com/greataihack1:${{ github.sha }}
+          docker tag myapp:${{ github.sha }} 242038040781.dkr.ecr.ap-southeast-5.amazonaws.com/my-ecr-repo:${{ github.sha }}
 
       - name: Push Docker image to ECR
         run: |
-          docker push 268060978153.dkr.ecr.ap-southeast-5.amazonaws.com/greataihack1:${{ github.sha }}
+          docker push 242038040781.dkr.ecr.ap-southeast-5.amazonaws.com/my-ecr-repo:${{ github.sha }}
 
       - id: task-def
         name: Update ECS task definition with new image
@@ -40,7 +40,7 @@ jobs:
             --query "taskDefinition.{family:family, taskRoleArn:taskRoleArn, executionRoleArn:executionRoleArn, networkMode:networkMode, containerDefinitions:containerDefinitions, volumes:volumes, placementConstraints:placementConstraints, requiresCompatibilities:requiresCompatibilities, cpu:cpu, memory:memory, tags:tags, pidMode:pidMode, ipcMode:ipcMode, proxyConfiguration:proxyConfiguration, inferenceAccelerators:inferenceAccelerators, ephemeralStorage:ephemeralStorage, runtimePlatform:runtimePlatform, enableFaultInjection:enableFaultInjection}" \
             --output json > taskdef.json
 
-            NEW_IMAGE="268060978153.dkr.ecr.ap-southeast-5.amazonaws.com/greataihack1:${{ github.sha }}"
+            NEW_IMAGE="242038040781.dkr.ecr.ap-southeast-5.amazonaws.com/my-ecr-repo:${{ github.sha }}"
             jq --arg IMAGE "$NEW_IMAGE" --arg OPENAI_KEY "${{ secrets.OPENAI_API_KEY }}" '
               del(.tags, .pidMode, .ipcMode, .proxyConfiguration, .inferenceAccelerators, .ephemeralStorage) |
               .containerDefinitions[0].image=$IMAGE |
@@ -60,8 +60,8 @@ jobs:
             echo $AWS_REGION
             echo $AWS_DEFAULT_REGION
             aws ecs update-service \
-            --cluster my-ecs-cluster \
-            --service nextjs-task-service-v0fg7npw \
+            --cluster my-app-cluster \
+            --service nextjs-task-service-t2q09utt \
             --health-check-grace-period-seconds 60 \
             --task-definition "${{ steps.task-def.outputs.taskdef_arn }}" \
             --force-new-deployment
