@@ -36,59 +36,102 @@ jobs:
       - id: task-def
         name: Update ECS task definition with new image
         run: |
-          # Fetch current task definition
           aws ecs describe-task-definition --task-definition nextjs-task:1 \
-            --query "taskDefinition" \
+            --query "taskDefinition.{family:family, taskRoleArn:taskRoleArn, executionRoleArn:executionRoleArn, networkMode:networkMode, containerDefinitions:containerDefinitions, volumes:volumes, placementConstraints:placementConstraints, requiresCompatibilities:requiresCompatibilities, cpu:cpu, memory:memory, tags:tags, pidMode:pidMode, ipcMode:ipcMode, proxyConfiguration:proxyConfiguration, inferenceAccelerators:inferenceAccelerators, ephemeralStorage:ephemeralStorage, runtimePlatform:runtimePlatform, enableFaultInjection:enableFaultInjection}" \
             --output json > taskdef.json
 
           NEW_IMAGE="242038040781.dkr.ecr.ap-southeast-5.amazonaws.com/my-ecr-repo:${{ github.sha }}"
-          
-          # Create new task definition with updated image and environment variables
           jq --arg IMAGE "$NEW_IMAGE" --arg OPENAI_KEY "${{ secrets.OPENAI_API_KEY }}" '
-            {
-              family: .family,
-              taskRoleArn: .taskRoleArn,
-              executionRoleArn: .executionRoleArn,
-              networkMode: .networkMode,
-              containerDefinitions: .containerDefinitions,
-              volumes: .volumes,
-              placementConstraints: .placementConstraints,
-              requiresCompatibilities: .requiresCompatibilities,
-              cpu: .cpu,
-              memory: .memory,
-              runtimePlatform: .runtimePlatform
-            } |
-            .containerDefinitions[0].image = $IMAGE |
-            .containerDefinitions[0].environment = (
-              (.containerDefinitions[0].environment // []) | 
-              map(select(.name != "OPENAI_API_KEY"))
-            ) + [{"name": "OPENAI_API_KEY", "value": $OPENAI_KEY}] |
-            if .taskRoleArn == null then del(.taskRoleArn) else . end |
-            if .volumes == null or .volumes == [] then del(.volumes) else . end |
-            if .placementConstraints == null or .placementConstraints == [] then del(.placementConstraints) else . end |
-            if .runtimePlatform == null then del(.runtimePlatform) else . end
+            del(.tags, .pidMode, .ipcMode, .proxyConfiguration, .inferenceAccelerators, .ephemeralStorage) |
+            .containerDefinitions[0].image=$IMAGE |
+            .containerDefinitions[0].environment = (.containerDefinitions[0].environment // []) |
+            .containerDefinitions[0].environment |= map(select(.name != "OPENAI_API_KEY")) + [{"name": "OPENAI_API_KEY", "value": $OPENAI_KEY}]
           ' taskdef.json > new-taskdef.json
 
-          # Debug: Show the new task definition
-          echo "New task definition:"
-          cat new-taskdef.json
-
-          # Register new task definition
-          TASKDEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json --query 'taskDefinition.taskDefinitionArn' --output text)
-          
-          if [ -z "$TASKDEF_ARN" ]; then
-            echo "Error: Failed to register task definition"
-            exit 1
-          fi
-          
+          TASKDEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json | jq -r '.taskDefinition.taskDefinitionArn')
           echo "New task definition ARN: $TASKDEF_ARN"
           echo "taskdef_arn=$TASKDEF_ARN" >> $GITHUB_OUTPUT
 
-      - name: Update ECS Service to use new task definition
+      - name: Check if service needs recreation
+        id: check-service
+        run: |
+          # Get current service configuration
+          SERVICE_INFO=$(aws ecs describe-services \
+            --cluster my-app-cluster \
+            --services nextjs-task-service-t2q09utt \
+            --query 'services[0]' \
+            --output json)
+          
+          # Get the target group ARN from service
+          SERVICE_TG=$(echo $SERVICE_INFO | jq -r '.loadBalancers[0].targetGroupArn // empty')
+          
+          # Get the actual target group ARN
+          ACTUAL_TG=$(aws elbv2 describe-target-groups \
+            --names my-app-targetgroup \
+            --query 'TargetGroups[0].TargetGroupArn' \
+            --output text)
+          
+          echo "Service Target Group: $SERVICE_TG"
+          echo "Actual Target Group: $ACTUAL_TG"
+          
+          if [ "$SERVICE_TG" != "$ACTUAL_TG" ]; then
+            echo "Target group mismatch detected. Service needs to be recreated."
+            echo "needs_recreation=true" >> $GITHUB_OUTPUT
+          else
+            echo "Target group matches. Service can be updated normally."
+            echo "needs_recreation=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Delete and Recreate Service (if needed)
+        if: steps.check-service.outputs.needs_recreation == 'true'
+        run: |
+          echo "Deleting old service..."
+          
+          # Get service configuration for recreation
+          SERVICE_CONFIG=$(aws ecs describe-services \
+            --cluster my-app-cluster \
+            --services nextjs-task-service-t2q09utt \
+            --query 'services[0]' \
+            --output json)
+          
+          # Delete the service
+          aws ecs delete-service \
+            --cluster my-app-cluster \
+            --service nextjs-task-service-t2q09utt \
+            --force
+          
+          echo "Waiting for service to be deleted..."
+          aws ecs wait services-inactive \
+            --cluster my-app-cluster \
+            --services nextjs-task-service-t2q09utt
+          
+          # Get the correct target group ARN
+          TARGET_GROUP_ARN=$(aws elbv2 describe-target-groups \
+            --names my-app-targetgroup \
+            --query 'TargetGroups[0].TargetGroupArn' \
+            --output text)
+          
+          # Get subnets and security groups from the old service config
+          SUBNETS=$(echo $SERVICE_CONFIG | jq -r '.networkConfiguration.awsvpcConfiguration.subnets | join(",")')
+          SECURITY_GROUPS=$(echo $SERVICE_CONFIG | jq -r '.networkConfiguration.awsvpcConfiguration.securityGroups | join(",")')
+          ASSIGN_PUBLIC_IP=$(echo $SERVICE_CONFIG | jq -r '.networkConfiguration.awsvpcConfiguration.assignPublicIp')
+          
+          echo "Recreating service with correct target group..."
+          aws ecs create-service \
+            --cluster my-app-cluster \
+            --service-name nextjs-task-service-t2q09utt \
+            --task-definition "${{ steps.task-def.outputs.taskdef_arn }}" \
+            --desired-count 1 \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SECURITY_GROUPS],assignPublicIp=$ASSIGN_PUBLIC_IP}" \
+            --load-balancers "targetGroupArn=$TARGET_GROUP_ARN,containerName=nextjs-container,containerPort=3000"
+          
+          echo "Service recreated successfully"
+
+      - name: Update ECS Service (if no recreation needed)
+        if: steps.check-service.outputs.needs_recreation == 'false'
         run: |
           echo "Updating ECS service with new task definition..."
-          echo "Task Definition ARN: ${{ steps.task-def.outputs.taskdef_arn }}"
-          
           aws ecs update-service \
             --cluster my-app-cluster \
             --service nextjs-task-service-t2q09utt \
@@ -101,3 +144,4 @@ jobs:
           aws ecs wait services-stable \
             --cluster my-app-cluster \
             --services nextjs-task-service-t2q09utt
+          echo "Deployment completed successfully!"
