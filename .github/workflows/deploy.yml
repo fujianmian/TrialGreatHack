@@ -3,7 +3,7 @@ name: Deploy to ECS
 on:
   push:
     branches:
-      - main  # 监听 main 分支 push
+      - main
 
 jobs:
   build-and-deploy:
@@ -36,32 +36,68 @@ jobs:
       - id: task-def
         name: Update ECS task definition with new image
         run: |
-            aws ecs describe-task-definition --task-definition nextjs-task:1 \
-            --query "taskDefinition.{family:family, taskRoleArn:taskRoleArn, executionRoleArn:executionRoleArn, networkMode:networkMode, containerDefinitions:containerDefinitions, volumes:volumes, placementConstraints:placementConstraints, requiresCompatibilities:requiresCompatibilities, cpu:cpu, memory:memory, tags:tags, pidMode:pidMode, ipcMode:ipcMode, proxyConfiguration:proxyConfiguration, inferenceAccelerators:inferenceAccelerators, ephemeralStorage:ephemeralStorage, runtimePlatform:runtimePlatform, enableFaultInjection:enableFaultInjection}" \
+          # Fetch current task definition
+          aws ecs describe-task-definition --task-definition nextjs-task:1 \
+            --query "taskDefinition" \
             --output json > taskdef.json
 
-            NEW_IMAGE="242038040781.dkr.ecr.ap-southeast-5.amazonaws.com/my-ecr-repo:${{ github.sha }}"
-            jq --arg IMAGE "$NEW_IMAGE" --arg OPENAI_KEY "${{ secrets.OPENAI_API_KEY }}" '
-              del(.tags, .pidMode, .ipcMode, .proxyConfiguration, .inferenceAccelerators, .ephemeralStorage) |
-              .containerDefinitions[0].image=$IMAGE |
-              .containerDefinitions[0].environment = (.containerDefinitions[0].environment // []) |
-              .containerDefinitions[0].environment |= map(select(.name != "OPENAI_API_KEY")) + [{"name": "OPENAI_API_KEY", "value": $OPENAI_KEY}]
-            ' taskdef.json > new-taskdef.json
+          NEW_IMAGE="242038040781.dkr.ecr.ap-southeast-5.amazonaws.com/my-ecr-repo:${{ github.sha }}"
+          
+          # Create new task definition with updated image and environment variables
+          jq --arg IMAGE "$NEW_IMAGE" --arg OPENAI_KEY "${{ secrets.OPENAI_API_KEY }}" '
+            {
+              family: .family,
+              taskRoleArn: .taskRoleArn,
+              executionRoleArn: .executionRoleArn,
+              networkMode: .networkMode,
+              containerDefinitions: .containerDefinitions,
+              volumes: .volumes,
+              placementConstraints: .placementConstraints,
+              requiresCompatibilities: .requiresCompatibilities,
+              cpu: .cpu,
+              memory: .memory,
+              runtimePlatform: .runtimePlatform
+            } |
+            .containerDefinitions[0].image = $IMAGE |
+            .containerDefinitions[0].environment = (
+              (.containerDefinitions[0].environment // []) | 
+              map(select(.name != "OPENAI_API_KEY"))
+            ) + [{"name": "OPENAI_API_KEY", "value": $OPENAI_KEY}] |
+            if .taskRoleArn == null then del(.taskRoleArn) else . end |
+            if .volumes == null or .volumes == [] then del(.volumes) else . end |
+            if .placementConstraints == null or .placementConstraints == [] then del(.placementConstraints) else . end |
+            if .runtimePlatform == null then del(.runtimePlatform) else . end
+          ' taskdef.json > new-taskdef.json
 
-            TASKDEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json | jq -r '.taskDefinition.taskDefinitionArn')
-            echo "New task definition ARN: $TASKDEF_ARN"
+          # Debug: Show the new task definition
+          echo "New task definition:"
+          cat new-taskdef.json
 
-            # This correctly sets the GitHub Actions output
-            echo "taskdef_arn=$TASKDEF_ARN" >> $GITHUB_OUTPUT
+          # Register new task definition
+          TASKDEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          
+          if [ -z "$TASKDEF_ARN" ]; then
+            echo "Error: Failed to register task definition"
+            exit 1
+          fi
+          
+          echo "New task definition ARN: $TASKDEF_ARN"
+          echo "taskdef_arn=$TASKDEF_ARN" >> $GITHUB_OUTPUT
 
       - name: Update ECS Service to use new task definition
         run: |
-            echo "Updating ECS service with new task definition..."
-            echo $AWS_REGION
-            echo $AWS_DEFAULT_REGION
-            aws ecs update-service \
+          echo "Updating ECS service with new task definition..."
+          echo "Task Definition ARN: ${{ steps.task-def.outputs.taskdef_arn }}"
+          
+          aws ecs update-service \
             --cluster my-app-cluster \
             --service nextjs-task-service-t2q09utt \
-            --health-check-grace-period-seconds 60 \
             --task-definition "${{ steps.task-def.outputs.taskdef_arn }}" \
             --force-new-deployment
+
+      - name: Wait for service to stabilize
+        run: |
+          echo "Waiting for service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster my-app-cluster \
+            --services nextjs-task-service-t2q09utt
