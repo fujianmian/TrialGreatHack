@@ -6,12 +6,11 @@ const nextConfig: NextConfig = {
     // serverActions: true, // keep this only if needed
   },
   eslint: {
-    ignoreDuringBuilds: true, // ignore ESLint errors during build
+    ignoreDuringBuilds: true,
   },
   async headers() {
     return [
       {
-        // Match the root HTML page
         source: '/',
         headers: [
           {
@@ -21,7 +20,6 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Match all other HTML pages
         source: '/:path*',
         headers: [
           {
@@ -29,6 +27,14 @@ const nextConfig: NextConfig = {
             value: 'no-cache, no-store, must-revalidate',
           },
         ],
+      },
+    ];
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/:path*',
+        destination: '/', // all routes serve index.html
       },
     ];
   },
