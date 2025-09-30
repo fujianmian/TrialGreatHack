@@ -63,7 +63,7 @@ const features: Feature[] = [
 export default function Home() {
   const [selectedInputMethod, setSelectedInputMethod] = useState('text');
   const [selectedOutputOption, setSelectedOutputOption] = useState<string>('');
-  const [inputText, setInputText] = useState('lol, Quantum computing is a field of computing focused on developing computer technology based on the principles of quantum theory. Quantum computers use quantum bits or qubits, which can represent both 0 and 1 simultaneously, unlike classical bits. This allows quantum computers to perform certain calculations much faster than traditional computers.');
+  const [inputText, setInputText] = useState('Quantum computing is a field of computing focused on developing computer technology based on the principles of quantum theory. Quantum computers use quantum bits or qubits, which can represent both 0 and 1 simultaneously, unlike classical bits. This allows quantum computers to perform certain calculations much faster than traditional computers.');
   const [isGenerating, setIsGenerating] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
