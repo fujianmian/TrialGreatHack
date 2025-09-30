@@ -133,10 +133,6 @@ async function generateAISummary(text: string) {
         console.log("not able to check LOCAL OR ECSSSSSSSSSSSSSSSSSSSSs");
         return new BedrockRuntimeClient({
           region: "us-east-1", // or your preferred region
-          credentials: {
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "",
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "",
-          },
         });
       }
     }
