@@ -10,7 +10,7 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# Stage 2: runtime
+# Stage 2: runtime try trigger
 FROM node:18-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
