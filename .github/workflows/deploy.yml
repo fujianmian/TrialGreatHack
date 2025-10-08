@@ -28,36 +28,43 @@ jobs:
       - id: task-def
         name: Update ECS task definition with new image
         run: |
-            aws ecs describe-task-definition --task-definition nextjs-task \
-            --query "taskDefinition.{family:family, taskRoleArn:taskRoleArn, executionRoleArn:executionRoleArn, networkMode:networkMode, containerDefinitions:containerDefinitions, volumes:volumes, placementConstraints:placementConstraints, requiresCompatibilities:requiresCompatibilities, cpu:cpu, memory:memory, runtimePlatform:runtimePlatform}" \
-            --output json > taskdef.json
-            NEW_IMAGE="242038040781.dkr.ecr.ap-southeast-5.amazonaws.com/my-ecr-repo:${{ github.sha }}"
-            jq --arg IMAGE "$NEW_IMAGE" --arg OPENAI_KEY "${{ secrets.OPENAI_API_KEY }}" '
-              # Remove null fields that cause validation errors
-              if .taskRoleArn == null then del(.taskRoleArn) else . end |
-              if .runtimePlatform == null then del(.runtimePlatform) else . end |
-              # Update container image
-              .containerDefinitions[0].image=$IMAGE |
-              # Update environment variables
-              .containerDefinitions[0].environment = (.containerDefinitions[0].environment // []) |
-              .containerDefinitions[0].environment |= map(select(.name != "OPENAI_API_KEY")) + [{"name": "OPENAI_API_KEY", "value": $OPENAI_KEY}]
-            ' taskdef.json > new-taskdef.json
-            cat new-taskdef.json
-            TASKDEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json | jq -r '.taskDefinition.taskDefinitionArn')
-            echo "New task definition ARN: $TASKDEF_ARN"
-            if [ -z "$TASKDEF_ARN" ] || [ "$TASKDEF_ARN" == "null" ]; then
-              echo "Error: Failed to register task definition"
-              exit 1
-            fi
-            echo "taskdef_arn=$TASKDEF_ARN" >> $GITHUB_OUTPUT
+          aws ecs describe-task-definition --task-definition nextjs-task \
+          --query "taskDefinition.{family:family, taskRoleArn:taskRoleArn, executionRoleArn:executionRoleArn, networkMode:networkMode, containerDefinitions:containerDefinitions, volumes:volumes, placementConstraints:placementConstraints, requiresCompatibilities:requiresCompatibilities, cpu:cpu, memory:memory, runtimePlatform:runtimePlatform}" \
+          --output json > taskdef.json
+          NEW_IMAGE="242038040781.dkr.ecr.ap-southeast-5.amazonaws.com/my-ecr-repo:${{ github.sha }}"
+          jq --arg IMAGE "$NEW_IMAGE" \
+            --arg OPENAI_KEY "${{ secrets.OPENAI_API_KEY }}" \
+            --arg COGNITO_CLIENT_ID "${{ secrets.COGNITO_CLIENT_ID }}" \
+            --arg COGNITO_USER_POOL_ID "${{ secrets.COGNITO_USER_POOL_ID }}"'
+            # Remove null fields that cause validation errors
+            if .taskRoleArn == null then del(.taskRoleArn) else . end |
+            if .runtimePlatform == null then del(.runtimePlatform) else . end |
+            # Update container image
+            .containerDefinitions[0].image=$IMAGE |
+            # Update environment variables
+            .containerDefinitions[0].environment = (.containerDefinitions[0].environment // []) |
+            .containerDefinitions[0].environment |= map(select(.name != "OPENAI_API_KEY" and .name != "COGNITO_CLIENT_ID" and .name != "COGNITO_USER_POOL_ID")) + [
+              {"name": "OPENAI_API_KEY", "value": $OPENAI_KEY},
+              {"name": "COGNITO_CLIENT_ID", "value": $COGNITO_CLIENT_ID},
+              {"name": "COGNITO_USER_POOL_ID", "value": $COGNITO_USER_POOL_ID}
+            ]
+          ' taskdef.json > new-taskdef.json
+          cat new-taskdef.json
+          TASKDEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json | jq -r '.taskDefinition.taskDefinitionArn')
+          echo "New task definition ARN: $TASKDEF_ARN"
+          if [ -z "$TASKDEF_ARN" ] || [ "$TASKDEF_ARN" == "null" ]; then
+            echo "Error: Failed to register task definition"
+            exit 1
+          fi
+          echo "taskdef_arn=$TASKDEF_ARN" >> $GITHUB_OUTPUT
       - name: Update ECS Service to use new task definition
         run: |
-            echo "Updating ECS service with new task definition..."
-            echo $AWS_REGION
-            echo $AWS_DEFAULT_REGION
-            aws ecs update-service \
-            --cluster my-app-cluster \
-            --service nextjs-task-service-t2q09utt \
-            --health-check-grace-period-seconds 60 \
-            --task-definition "${{ steps.task-def.outputs.taskdef_arn }}" \
-            --force-new-deployment
+          echo "Updating ECS service with new task definition..."
+          echo $AWS_REGION
+          echo $AWS_DEFAULT_REGION
+          aws ecs update-service \
+          --cluster my-app-cluster \
+          --service nextjs-task-service-t2q09utt \
+          --health-check-grace-period-seconds 60 \
+          --task-definition "${{ steps.task-def.outputs.taskdef_arn }}" \
+          --force-new-deployment
