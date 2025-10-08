@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BedrockRuntimeClient, StartAsyncInvokeCommand, GetAsyncInvokeCommand } from '@aws-sdk/client-bedrock-runtime';
 import OpenAI from 'openai';
+import { createBedrockClient } from '@/lib/bedrock';
 
 const NOVA_REGION = 'us-east-1';
-// ✅ Using your actual S3 bucket
-const S3_BUCKET_NAME = 'nova-reel-videos-20';
+// Use the S3 bucket from environment variables
+const S3_BUCKET_NAME = process.env.AWS_S3_BUCKET || 'nova-reel-videos-bucket';
 const OUTPUT_S3_URI = `s3://${S3_BUCKET_NAME}/`;
 
 export async function POST(request: NextRequest) {
@@ -12,29 +13,6 @@ export async function POST(request: NextRequest) {
     console.log('API route hit');
     const { prompt, action, invocationArn, text, style } = await request.json();
     console.log('Received request:', { prompt, action, invocationArn, text, style });
-
-
-    function createBedrockClient() {
-      console.log("ECS_CONTAINER_METADATA_URI", process.env.ECS_CONTAINER_METADATA_URI);
-      console.log("ECS_CONTAINER_METADATA_URI_V4", process.env.ECS_CONTAINER_METADATA_URI_V4);
-      console.log("region", process.env.REGION);
-
-      if (process.env.ECS_CONTAINER_METADATA_URI || process.env.ECS_CONTAINER_METADATA_URI_V4) {
-        // Running in ECS → rely on Task Role automatically
-        console.log("able to check LOCAL OR ECSSSSSSSSSSSSSSSSSSSSs");
-        return new BedrockRuntimeClient({ region: "us-east-1" });
-      } else {
-        // Running locally → use env credentials
-        console.log("not able to check LOCAL OR ECSSSSSSSSSSSSSSSSSSSSs");
-        return new BedrockRuntimeClient({
-          region: "us-east-1", // or your preferred region
-          credentials: {
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "",
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "",
-          },
-        });
-      }
-    }
 
     const client = createBedrockClient();
 

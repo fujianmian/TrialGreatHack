@@ -30,14 +30,6 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  async rewrites() {
-    return [
-      {
-        source: '/:path*',
-        destination: '/', // all routes serve index.html
-      },
-    ];
-  },
 };
 
 export default nextConfig;

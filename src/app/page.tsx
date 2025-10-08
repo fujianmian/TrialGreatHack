@@ -67,6 +67,7 @@ export default function Home() {
   const [inputText, setInputText] = useState('A cute cat playing with a ball of yarn.');
   const [isGenerating, setIsGenerating] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isRecommending, setIsRecommending] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showFlashcards, setShowFlashcards] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
@@ -188,7 +189,7 @@ export default function Home() {
   };
 
   async function handleRecommendation() {
-    setLoading(true);
+    setIsRecommending(true);
     const res = await fetch("/api/recommend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -201,7 +202,7 @@ export default function Home() {
       setSelectedOutputOption(normalized);
       setRecommendation(normalized);
     }
-    setLoading(false);
+    setIsRecommending(false);
   }
 
   const handleGenerate = () => {
@@ -667,11 +668,11 @@ export default function Home() {
             <div className="text-center mb-6">
               <button
                 onClick={handleRecommendation}
-                disabled={loading}
+                disabled={isRecommending}
                 className="px-12 py-4 rounded-full bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] text-white font-semibold text-lg hover:from-[#4A2480] hover:to-[#C41A75] transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
-                <i className={`fas ${loading ? 'fa-spinner fa-spin' : 'fa-bolt'} mr-3`}></i>
-                {loading ? 'Analyzing...' : 'Don\'t know which to pick? Click here!'}
+                <i className={`fas ${isRecommending ? 'fa-spinner fa-spin' : 'fa-bolt'} mr-3`}></i>
+                {isRecommending ? 'Thinking very hard rn......' : 'Don\'t know which to pick? Click here!'}
               </button>
               {!loading && recommendation && (
                 <p className="mt-2 text-sm text-gray-500 text-center">

@@ -17,7 +17,16 @@ export async function POST(req: NextRequest) {
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    const openaiPrompt = `Based on the following text, generate a short, descriptive prompt for an image generation model. The prompt should be a single sentence that captures the main subject and visual elements.
+    const openaiPrompt = `Analyze the following text and generate a safe, descriptive prompt for an image generation model.
+
+**CRITICAL SAFETY REQUIREMENTS:**
+- **Compliance:** The prompt MUST strictly adhere to the AWS Responsible AI Policy.
+- **Sanitization:** Aggressively remove or rephrase any themes related to violence, conflict, hate speech, sexual content, or other sensitive topics.
+- **Clarity and Neutrality:** The prompt must be neutral, descriptive, and suitable for a general audience.
+- **Focus on Visuals:** Describe a visual scene. Do not include abstract or controversial concepts. For example, instead of "a prompt about war," generate "a historical map showing troop movements" or "a peaceful landscape with rolling hills."
+
+**Task:**
+Generate a single, safe sentence that describes a visual scene based on the text below.
 
 Text to analyze:
 ${text}`;
@@ -27,14 +36,14 @@ ${text}`;
       messages: [
         {
           role: "system",
-          content: "You are an expert in creating concise, effective prompts for image generation models."
+          content: "You are an AI assistant that specializes in rephrasing and sanitizing user-provided text to create safe, policy-compliant prompts for a downstream image generation AI. Your absolute priority is to generate prompts that will not be blocked by content filters, specifically the AWS Responsible AI Policy. You must remove or rephrase any content that is violent, hateful, sexually explicit, or otherwise sensitive."
         },
         {
           role: "user",
           content: openaiPrompt
         }
       ],
-      temperature: 0.7,
+      temperature: 0.5,
       max_tokens: 100
     });
 
@@ -74,6 +83,15 @@ ${text}`;
     return NextResponse.json({ imageUrl });
   } catch (error: any) {
     console.error('Error generating image:', JSON.stringify(error, null, 2));
+
+    // Check for content filter error and return a user-friendly message
+    if (error.message && error.message.includes('blocked by our content filters')) {
+      return NextResponse.json({
+        error: 'Content Filtered',
+        details: 'The generated prompt was blocked by the AWS content filter. Please try rephrasing your input to be less specific about sensitive topics.'
+      }, { status: 400 });
+    }
+
     return NextResponse.json({ error: 'Failed to generate image', details: error.message }, { status: 500 });
   }
 }
