@@ -104,17 +104,6 @@ async function generateAISummary(text: string) {
   console.log("AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID ? "✅ Set" : "❌ Not set");
   console.log("AWS_SECRET_ACCESS_KEY:", process.env.AWS_SECRET_ACCESS_KEY ? "✅ Set" : "❌ Not set");
   
-  // List of models to try in order of preference
-  // Using Amazon Nova Pro as primary model with fallbacks
-  const modelsToTry = [
-    'amazon.nova-pro-v1:0',
-    'amazon.nova-lite-v1:0',
-    'anthropic.claude-3-haiku-20240307-v1:0',
-    'anthropic.claude-3-sonnet-20240229-v1:0'
-  ];
-  
-  console.log("🎯 Models to try:", modelsToTry);
-  
   try {
     // Dynamic import to handle potential module not found errors
     const { BedrockRuntimeClient, InvokeModelCommand } = await import('@aws-sdk/client-bedrock-runtime');
@@ -162,7 +151,7 @@ Text to summarize:
 ${text}`;
 
     const input = {
-      modelId: 'anthropic.claude-3-sonnet-20240229-v1:0',
+      modelId: 'amazon.nova-pro-v1:0',
       contentType: 'application/json',
       accept: 'application/json',
       body: JSON.stringify({
