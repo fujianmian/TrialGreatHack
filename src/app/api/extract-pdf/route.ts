@@ -3,9 +3,8 @@ import pdfParse from 'pdf-parse';
 import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import { createBedrockClient } from '@/lib/bedrock';
 
-const client = createBedrockClient();
-
 export async function POST(request: NextRequest) {
+  const client = createBedrockClient();
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
