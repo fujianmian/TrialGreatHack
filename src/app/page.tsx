@@ -492,7 +492,6 @@ export default function Home() {
             <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto mb-10 leading-relaxed">
               Generate educational videos, detailed notes, flashcards, and more from any content with our powerful AI assistant.
             </p>
-            {isAuthenticated ? (
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button 
                 onClick={scrollToMainContent}
@@ -506,14 +505,6 @@ export default function Home() {
                 Watch Demo
               </button>
             </div>
-            ) : (
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="px-10 py-4 rounded-full border-2 border-gray-600 text-white font-semibold text-lg hover:border-[#5E2E8F] hover:text-[#5E2E8F] hover:bg-[#5E2E8F]/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
-                <i className="fas fa-play mr-3"></i>
-                Watch Demo
-              </button>
-            </div>
-            )}
           </div>
         </section>
         
@@ -628,12 +619,25 @@ export default function Home() {
           
           {/* Output Section */}
           <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-300 relative" style={{border: '2px solid transparent', background: 'linear-gradient(white, white) padding-box, linear-gradient(135deg, #5E2E8F, #D81E83) border-box'}}>
-            <h2 className="text-2xl md:text-3xl mb-6 text-[#5E2E8F] flex items-center gap-3 font-bold">
-              <div className="p-2 bg-[#5E2E8F]/10 rounded-xl">
-                <i className="fas fa-magic text-xl text-[#5E2E8F]"></i>
-              </div>
-              Choose Output
-            </h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl md:text-3xl text-[#5E2E8F] flex items-center gap-3 font-bold">
+                <div className="p-2 bg-[#5E2E8F]/10 rounded-xl">
+                  <i className="fas fa-magic text-xl text-[#5E2E8F]"></i>
+                </div>
+                Choose Output
+              </h2>
+              
+              {isAuthenticated && (
+                <button
+                  onClick={handleHistory}
+                  className="relative p-4 rounded-full bg-gradient-to-r from-[#9333EA] to-[#EC4899] text-white hover:from-[#7C3AED] hover:to-[#DB2777] transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group border-2 border-white/20 hover:border-white/40"
+                  title="Check History"
+                >
+                  <i className="fas fa-history text-xl"></i>
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#FF6B6B] rounded-full animate-pulse"></div>
+                </button>
+              )}
+            </div>
             
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
               {outputOptions.map((option) => (
@@ -707,7 +711,7 @@ export default function Home() {
         {/* Features Section */}
         <section id="features" className="mb-20">
           <h2 className="text-center text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] bg-clip-text text-transparent">
-            Why Choose EduAI?
+            Why Choose SmartHub?
           </h2>
           <p className="text-center text-xl text-gray-600 mb-16 max-w-3xl mx-auto">
             Experience the future of learning with our cutting-edge AI technology
@@ -779,7 +783,7 @@ export default function Home() {
           </div>
           
           <div className="border-t border-gray-800 mt-8 pt-8 text-center">
-            <p className="text-gray-300">© 2025 EduAI. All rights reserved.</p>
+            <p className="text-gray-300">© 2025 SmartHub. All rights reserved.</p>
           </div>
         </div>
       </footer>
