@@ -25,7 +25,6 @@ interface Feature {
   title: string;
   description: string;
 }
-//trigger 
 
 const inputMethods: InputMethod[] = [
   { id: 'text', name: 'Text', icon: 'fas fa-font' },
@@ -72,13 +71,16 @@ export default function Home() {
   const [showMindMap, setShowMindMap] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
   const [showQuiz, setShowQuiz] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);   
   const [fileContent, setFileContent] = useState<string>('');
   const [difficultyLevel, setDifficultyLevel] = useState<string>('Beginner');
   const [recommendation, setRecommendation] = useState<string | null>(null);
-
   
-  // Ref for the main content section to scroll to
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  
   const mainContentRef = useRef<HTMLDivElement>(null);
 
   // Add Font Awesome to head
@@ -93,14 +95,94 @@ export default function Home() {
     };
   }, []);
 
-  // Logger for mounting
+  // Close user menu when clicking outside
   useEffect(() => {
-    console.log('[Home] Mounted');
-    return () => {
-      console.log('[Home] Unmounted');
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showUserMenu && !target.closest('.user-menu-container')) {
+        setShowUserMenu(false);
+      }
     };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUserMenu]);
+
+  // Check authentication status
+  useEffect(() => {
+    checkAuthStatus();
   }, []);
 
+  const handleHistory = () => {
+    // Navigate to history page or show history modal
+    console.log('Navigating to history');
+    // window.location.href = '/history';
+  };
+
+  const checkAuthStatus = async () => {
+    try {
+      // Check both Cognito session and legacy auth
+      const sessionData = sessionStorage.getItem('cognitoSession');
+      const localData = localStorage.getItem('cognitoSession');
+      const legacyToken = localStorage.getItem('authToken');
+      
+      if (sessionData || localData) {
+        const session = JSON.parse((sessionData || localData) as string);
+        if (session.idToken && session.email) {
+          setIsAuthenticated(true);
+          setUser({ email: session.email });
+          return;
+        }
+      }
+      
+      // Fallback to legacy storage
+      if (legacyToken) {
+        const userData = localStorage.getItem('userData');
+        if (userData) {
+          setIsAuthenticated(true);
+          setUser(JSON.parse(userData));
+          return;
+        }
+      }
+      
+      // Not authenticated
+      setIsAuthenticated(false);
+      setUser(null);
+    } catch (error) {
+      console.log('Not authenticated:', error);
+      setIsAuthenticated(false);
+      setUser(null);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      setLoading(true); // Add this line
+      
+      // Clear all session data
+      sessionStorage.removeItem('cognitoSession');
+      localStorage.removeItem('cognitoSession');
+      sessionStorage.removeItem('authToken');
+      localStorage.removeItem('userData');
+      
+      // Add 1 second delay
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Add this line
+      
+      setIsAuthenticated(false);
+      setUser(null);
+      setShowUserMenu(false);
+      
+      setLoading(false); // Add this line
+      
+      // Optional: redirect to home or login
+      // window.location.href = '/';
+    } catch (error) {
+      console.error('Logout error:', error);
+      setLoading(false); // Add this line
+    }
+  };
 
   async function handleRecommendation() {
     setLoading(true);
@@ -111,175 +193,107 @@ export default function Home() {
     });
 
     const data = await res.json();
-    // Highlight the recommended option
     if (data.recommendation) {
       const normalized = data.recommendation.toLowerCase().trim();
       setSelectedOutputOption(normalized);
-      setRecommendation(normalized); // 👈 add this
+      setRecommendation(normalized);
     }
     setLoading(false);
   }
 
   const handleGenerate = () => {
     console.log('[Home] handleGenerate called. Output option:', selectedOutputOption);
-    // Reset all show states first
     setShowFlashcards(false);
     setShowSummary(false);
     setShowMindMap(false);
     setShowVideo(false);
     setShowQuiz(false);
 
-    // Check if flashcards are selected
     if (selectedOutputOption === 'flashcards') {
-      console.log('[Home] Showing flashcards for input:', inputText);
       setShowFlashcards(true);
       return;
     }
-
-    // Check if summary is selected
     if (selectedOutputOption === 'summary') {
-      console.log('[Home] Showing summary for input:', inputText);
       setShowSummary(true);
       return;
     }
-
-    // Check if mind map is selected
     if (selectedOutputOption === 'mindmap') {
-      console.log('[Home] Showing mind map for input:', inputText);
       setShowMindMap(true);
       return;
     }
-
-    // Check if video is selected
     if (selectedOutputOption === 'video') {
-      console.log('[Home] Showing video for input:', inputText);
       setShowVideo(true);
       return;
     }
-
-    // Check if quiz is selected
     if (selectedOutputOption === 'quiz') {
-      console.log('[Home] Showing quiz for input:', inputText);
       setShowQuiz(true);
       return;
     }
 
     setIsGenerating(true);
-    console.log('[Home] Generating output for:', selectedOutputOption, 'with input:', inputText);
-    // Simulate loading delay with more realistic content
     setTimeout(() => {
       setIsGenerating(false);
-      console.log('[Home] Generation finished');
     }, 2000);
   };
 
-  const handleBackFromFlashcards = () => {
-    setShowFlashcards(false);
-  };
-
-  const handleBackFromSummary = () => {
-    setShowSummary(false);
-  };
-
-  const handleBackFromMindMap = () => {
-    setShowMindMap(false);
-  };
-
-  const handleBackFromVideo = () => {
-    setShowVideo(false);
-  };
-
-  const handleBackFromQuiz = () => {
-    setShowQuiz(false);
-  };
+  const handleBackFromFlashcards = () => setShowFlashcards(false);
+  const handleBackFromSummary = () => setShowSummary(false);
+  const handleBackFromMindMap = () => setShowMindMap(false);
+  const handleBackFromVideo = () => setShowVideo(false);
+  const handleBackFromQuiz = () => setShowQuiz(false);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      console.log('[Home] File uploaded:', file.name, 'type:', file.type);
       setUploadedFile(file);
-
-      // Read file content based on file type
       const reader = new FileReader();
       reader.onload = (e) => {
         const content = e.target?.result as string;
-        console.log('[Home] FileReader loaded content:', content?.slice(0, 100));
         setFileContent(content);
-        setInputText(content); // Update the main input text
+        setInputText(content);
       };
 
       if (file.type === 'text/plain' || file.type === 'text/csv') {
         reader.readAsText(file);
       } else if (file.type === 'application/pdf') {
-        // Call your backend API route
         const formData = new FormData();
         formData.append('file', file);
-
         try {
           const response = await fetch('/api/extract-pdf', {
             method: 'POST',
             body: formData,
           });
-
-          if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to extract PDF text');
-          }
-
+          if (!response.ok) throw new Error('Failed to extract PDF text');
           const data = await response.json();
-          console.log('[Home] PDF extracted text (raw):', data.extractedText?.slice(0, 100));
-          console.log('[Home] PDF processed content:', data.processedContent?.slice(0, 100));
-
           setFileContent(data.extractedText);
-          setInputText(data.processedContent); // or use extractedText depending on your need
+          setInputText(data.processedContent);
         } catch (err) {
-          console.error('[Home] Error extracting PDF:', err);
+          console.error('Error extracting PDF:', err);
           setFileContent('Failed to extract PDF text.');
           setInputText('');
-        }} 
-        else if (file.type.includes('word') || file.type.includes('document')) {
-              const text = await extractWordText(file);
-
-        async function extractWordText(file: File): Promise<string> {
-          // Placeholder implementation for extracting text from a Word document
-          return "Extracted text from Word document (placeholder)";
         }
-        console.log('[Home] Word extracted text:', text?.slice(0, 100));
-        setFileContent(text);
-        setInputText(text);
-      } else {
-        setFileContent('File uploaded successfully!');
-        setInputText('File uploaded successfully!');
-        console.log('[Home] Unknown file type, set generic content');
       }
     }
   };
 
   const handleRemoveFile = () => {
-    console.log('[Home] Removing uploaded file');
     setUploadedFile(null);
     setFileContent('');
     setInputText('');
   };
 
   const handleInputMethodChange = (methodId: string) => {
-    console.log('[Home] Input method changed:', methodId);
     setSelectedInputMethod(methodId);
-
-    // Reset file-related state when switching away from upload
     if (methodId !== 'upload') {
       setUploadedFile(null);
       setFileContent('');
     }
-
-    // Reset input text when switching to a new method (except upload)
     if (methodId !== 'upload' && methodId !== selectedInputMethod) {
       setInputText('');
     }
   };
 
   const scrollToMainContent = () => {
-    console.log('[Home] Scrolling to main content');
     if (mainContentRef.current) {
       mainContentRef.current.scrollIntoView({
         behavior: 'smooth',
@@ -290,39 +304,25 @@ export default function Home() {
 
   const getQuestionCount = (difficulty: string): number => {
     switch (difficulty) {
-      case 'Beginner':
-        return 5;
-      case 'Intermediate':
-        return 10;
-      case 'Advanced':
-        return 15;
-      default:
-        return 5;
+      case 'Beginner': return 5;
+      case 'Intermediate': return 10;
+      case 'Advanced': return 15;
+      default: return 5;
     }
   };
 
-  // Show flashcard component if flashcards are selected
   if (showFlashcards) {
     return <TextToCard inputText={inputText} onBack={handleBackFromFlashcards} questionCount={getQuestionCount(difficultyLevel)} difficulty={difficultyLevel} />;
   }
-
-  // Show summary component if summary is selected
   if (showSummary) {
     return <TextToSummary inputText={inputText} onBack={handleBackFromSummary} />;
   }
-
-  // Show mind map component if mind map is selected
   if (showMindMap) {
     return <TextToMap inputText={inputText} onBack={handleBackFromMindMap} />;
   }
-
-  
-  // Show video component if video is selected
   if (showVideo) {
     return <TextToVideo inputText={inputText} onBack={handleBackFromVideo} />;
   }
-
-  // Show quiz component if quiz is selected
   if (showQuiz) {
     return <TextToQuiz inputText={inputText} onBack={handleBackFromQuiz} questionCount={getQuestionCount(difficultyLevel)} difficulty={difficultyLevel} />;
   }
@@ -340,7 +340,6 @@ export default function Home() {
                 className="w-full h-full object-contain drop-shadow-2xl filter brightness-110 contrast-110"
                 style={{
                   filter: 'drop-shadow(0 0 20px rgba(147, 51, 234, 0.8)) drop-shadow(0 0 40px rgba(126, 34, 206, 0.6)) drop-shadow(0 0 60px rgba(109, 40, 217, 0.4))',
-                  animation: 'logo-glow-purple 2s ease-in-out infinite alternate'
                 }}
               />
             </div>
@@ -376,14 +375,71 @@ export default function Home() {
             <i className={`fas ${isMenuOpen ? 'fa-times' : 'fa-bars'} text-xl text-white`}></i>
           </button>
           
-          {/* Desktop Auth Buttons */}
-          <div className="hidden lg:flex gap-4">
-            <button className="px-6 py-3 rounded-full bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] text-white font-semibold hover:from-[#4A2480] hover:to-[#C41A75] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-              Log In
-            </button>
-            <button className="px-6 py-3 rounded-full bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] text-white font-semibold hover:from-[#4A2480] hover:to-[#C41A75] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl">
-              Sign Up
-            </button>
+          {/* Desktop Auth Buttons / User Menu */}
+          <div className="hidden lg:flex gap-4 items-center">
+            {isAuthenticated ? (
+              <div className="relative user-menu-container">
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center gap-3 px-4 py-2 rounded-full bg-gray-800 hover:bg-gray-700 transition-all"
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] flex items-center justify-center">
+                    <i className="fas fa-user text-white text-sm"></i>
+                  </div>
+                  <span className="text-white font-medium">{user?.email || 'User'}</span>
+                  <i className={`fas fa-chevron-${showUserMenu ? 'up' : 'down'} text-gray-400 text-sm`}></i>
+                </button>
+                
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-56 bg-gray-800 rounded-xl shadow-2xl border border-gray-700 py-2 z-50">
+                    <button
+                      onClick={handleHistory}
+                      className="w-full px-4 py-3 text-left text-white hover:bg-gray-700 transition-colors flex items-center gap-3"
+                    >
+                      <i className="fas fa-history text-[#D81E83]"></i>
+                      <span>History</span>
+                    </button>
+                    <button
+                      onClick={() => console.log('Profile')}
+                      className="w-full px-4 py-3 text-left text-white hover:bg-gray-700 transition-colors flex items-center gap-3"
+                    >
+                      <i className="fas fa-user-circle text-[#D81E83]"></i>
+                      <span>Profile</span>
+                    </button>
+                    <button
+                      onClick={() => console.log('Settings')}
+                      className="w-full px-4 py-3 text-left text-white hover:bg-gray-700 transition-colors flex items-center gap-3"
+                    >
+                      <i className="fas fa-cog text-[#D81E83]"></i>
+                      <span>Settings</span>
+                    </button>
+                    <div className="border-t border-gray-700 my-2"></div>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full px-4 py-3 text-left text-red-400 hover:bg-gray-700 transition-colors flex items-center gap-3"
+                    >
+                      <i className="fas fa-sign-out-alt"></i>
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                <a 
+                  href="/login"
+                  className="px-6 py-3 rounded-full bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] text-white font-semibold hover:from-[#4A2480] hover:to-[#C41A75] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
+                >
+                  Log In
+                </a>
+                <a 
+                  href="/signup"
+                  className="px-6 py-3 rounded-full bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] text-white font-semibold hover:from-[#4A2480] hover:to-[#C41A75] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl"
+                >
+                  Sign Up
+                </a>
+              </>
+            )}
           </div>
         </header>
 
@@ -396,18 +452,38 @@ export default function Home() {
               <a href="#how-it-works" className="block text-white font-semibold hover:text-[#D81E83] transition-colors py-2">How It Works</a>
               <a href="#pricing" className="block text-white font-semibold hover:text-[#D81E83] transition-colors py-2">Pricing</a>
             </nav>
-            <div className="flex gap-3 mt-6">
-              <button className="flex-1 px-4 py-3 rounded-full bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] text-white font-semibold hover:from-[#4A2480] hover:to-[#C41A75] transition-all">
-                Log In
-              </button>
-              <button className="flex-1 px-4 py-3 rounded-full bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] text-white font-semibold hover:from-[#4A2480] hover:to-[#C41A75] transition-all">
-                Sign Up
-              </button>
-            </div>
+            
+            {isAuthenticated ? (
+              <div className="mt-6 space-y-3">
+                <button
+                  onClick={handleHistory}
+                  className="w-full px-4 py-3 rounded-full bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] text-white font-semibold hover:from-[#4A2480] hover:to-[#C41A75] transition-all flex items-center justify-center gap-2"
+                >
+                  <i className="fas fa-history"></i>
+                  History
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="w-full px-4 py-3 rounded-full border-2 border-red-500 text-red-500 font-semibold hover:bg-red-500 hover:text-white transition-all"
+                >
+                  <i className="fas fa-sign-out-alt mr-2"></i>
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-3 mt-6">
+                <button className="flex-1 px-4 py-3 rounded-full bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] text-white font-semibold hover:from-[#4A2480] hover:to-[#C41A75] transition-all">
+                  Log In
+                </button>
+                <button className="flex-1 px-4 py-3 rounded-full bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] text-white font-semibold hover:from-[#4A2480] hover:to-[#C41A75] transition-all">
+                  Sign Up
+                </button>
+              </div>
+            )}
           </div>
         )}
         
-        {/* Enhanced Hero Section */}
+        {/* Hero Section */}
         <section className="text-center py-16 mb-12">
           <div className="max-w-4xl mx-auto">
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] bg-clip-text text-transparent leading-tight">
@@ -432,7 +508,7 @@ export default function Home() {
           </div>
         </section>
         
-        {/* Enhanced Main Content */}
+        {/* Main Content - Input/Output sections */}
         <div ref={mainContentRef} className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-16">
           {/* Input Section */}
           <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-300 relative" style={{border: '2px solid transparent', background: 'linear-gradient(white, white) padding-box, linear-gradient(135deg, #5E2E8F, #D81E83) border-box'}}>
@@ -474,34 +550,19 @@ export default function Home() {
                           </p>
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <button
-                          onClick={handleRemoveFile}
-                          className="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
-                        >
-                          <i className="fas fa-trash mr-2"></i>
-                          Remove File
-                        </button>
-                        {fileContent && (
-                          <div className="mt-4 p-3 bg-gray-50 rounded-lg max-h-32 overflow-y-auto">
-                            <p className="text-sm text-gray-800 text-left">
-                              {fileContent.length > 200 
-                                ? fileContent.substring(0, 200) + '...' 
-                                : fileContent
-                              }
-                            </p>
-                          </div>
-                        )}
-                      </div>
+                      <button
+                        onClick={handleRemoveFile}
+                        className="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
+                      >
+                        <i className="fas fa-trash mr-2"></i>
+                        Remove File
+                      </button>
                     </div>
                   ) : (
                     <div className="text-center w-full">
                       <i className="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-3"></i>
                       <p className="text-base font-medium text-black mb-2">
                         Upload a file to get started
-                      </p>
-                      <p className="text-xs text-gray-700 mb-3">
-                        Supports TXT, PDF, and Word documents
                       </p>
                       <label className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] text-white rounded-lg hover:from-[#4A2480] hover:to-[#C41A75] transition-colors cursor-pointer text-sm">
                         <i className="fas fa-file-upload mr-2"></i>
@@ -521,15 +582,7 @@ export default function Home() {
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   className="w-full h-40 p-4 border-2 border-gray-200 rounded-xl resize-y text-base text-black focus:outline-none focus:border-[#5E2E8F] focus:ring-4 focus:ring-[#5E2E8F]/20 transition-all duration-300"
-                  placeholder={
-                    selectedInputMethod === 'text' 
-                      ? "Paste your text, article, or any content you want to learn from..."
-                      : selectedInputMethod === 'url'
-                      ? "Enter a URL to extract content from..."
-                      : selectedInputMethod === 'voice'
-                      ? "Click the microphone to start voice input..."
-                      : "Paste your text, article, or any content you want to learn from..."
-                  }
+                  placeholder="Paste your text, article, or any content you want to learn from..."
                 />
               )}
             </div>
@@ -558,7 +611,6 @@ export default function Home() {
                     <option>English</option>
                     <option>Spanish</option>
                     <option>French</option>
-                    <option>German</option>
                   </select>
                 </div>
               </div>
@@ -591,14 +643,14 @@ export default function Home() {
               ))}
             </div>
 
-            <div className="text-center">
+            <div className="text-center mb-6">
               <button
                 onClick={handleRecommendation}
                 disabled={loading}
                 className="px-12 py-4 rounded-full bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] text-white font-semibold text-lg hover:from-[#4A2480] hover:to-[#C41A75] transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 <i className={`fas ${loading ? 'fa-spinner fa-spin' : 'fa-bolt'} mr-3`}></i>
-                {loading ? 'Analyzing...' : 'Don’t know which to pick? Click here!'}
+                {loading ? 'Analyzing...' : 'Don\'t know which to pick? Click here!'}
               </button>
               {!loading && recommendation && (
                 <p className="mt-2 text-sm text-gray-500 text-center">
@@ -606,7 +658,6 @@ export default function Home() {
                 </p>
               )}
             </div>
-            
             
             <div className="bg-gray-50 rounded-xl p-4 mb-6">
               <h3 className="text-lg font-semibold mb-3 text-black flex items-center gap-2">
@@ -644,10 +695,9 @@ export default function Home() {
           </div>
         </div>
         
-        
-        {/* Enhanced Features Section */}
+        {/* Features Section */}
         <section id="features" className="mb-20">
-            <h2 className="text-center text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] bg-clip-text text-transparent">
+          <h2 className="text-center text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] bg-clip-text text-transparent">
             Why Choose EduAI?
           </h2>
           <p className="text-center text-xl text-gray-600 mb-16 max-w-3xl mx-auto">
@@ -668,7 +718,7 @@ export default function Home() {
         </section>
       </div>
       
-      {/* Enhanced Footer */}
+      {/* Footer */}
       <footer className="bg-black border-t border-gray-800 mt-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
@@ -724,8 +774,14 @@ export default function Home() {
           </div>
         </div>
       </footer>
-      
-      {/* Chat Widget */}
+      {loading && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="text-center">
+            <i className="fas fa-spinner fa-spin text-white text-4xl mb-4"></i>
+            <p className="text-white text-lg">Logging out...</p>
+          </div>
+        </div>
+      )}
       <ChatBox />
     </div>
   );
