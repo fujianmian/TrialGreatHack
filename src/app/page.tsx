@@ -492,6 +492,7 @@ export default function Home() {
             <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto mb-10 leading-relaxed">
               Generate educational videos, detailed notes, flashcards, and more from any content with our powerful AI assistant.
             </p>
+            {isAuthenticated ? (
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button 
                 onClick={scrollToMainContent}
@@ -505,6 +506,14 @@ export default function Home() {
                 Watch Demo
               </button>
             </div>
+            ) : (
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button className="px-10 py-4 rounded-full border-2 border-gray-600 text-white font-semibold text-lg hover:border-[#5E2E8F] hover:text-[#5E2E8F] hover:bg-[#5E2E8F]/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+                <i className="fas fa-play mr-3"></i>
+                Watch Demo
+              </button>
+            </div>
+            )}
           </div>
         </section>
         
