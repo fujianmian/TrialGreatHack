@@ -6,6 +6,7 @@ import TextToSummary from './ttosummary/texttosummary';
 import TextToMap from './ttomap/texttomap';
 import TextToVideo from './ttovideo/texttovideo';
 import TextToQuiz from './texttoquiz/texttoquiz';
+import TextToPicture from './ttopic/texttopicture';
 import ChatBox from './chatbox';
 
 interface InputMethod {
@@ -39,6 +40,7 @@ const outputOptions: OutputOption[] = [
   { id: 'mindmap', name: 'Mind Map', icon: 'fas fa-brain' },
   { id: 'quiz', name: 'Quiz', icon: 'fas fa-question-circle' },
   { id: 'summary', name: 'Summary', icon: 'fas fa-chart-bar' },
+  { id: 'picture', name: 'Picture', icon: 'fas fa-image' },
 ];
 
 const features: Feature[] = [
@@ -62,7 +64,7 @@ const features: Feature[] = [
 export default function Home() {
   const [selectedInputMethod, setSelectedInputMethod] = useState('text');
   const [selectedOutputOption, setSelectedOutputOption] = useState<string>('');
-  const [inputText, setInputText] = useState('Quantum computing is a field of computing focused on developing computer technology based on the principles of quantum theory. Quantum computers use quantum bits or qubits, which can represent both 0 and 1 simultaneously, unlike classical bits. This allows quantum computers to perform certain calculations much faster than traditional computers.');
+  const [inputText, setInputText] = useState('A cute cat playing with a ball of yarn.');
   const [isGenerating, setIsGenerating] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -71,7 +73,8 @@ export default function Home() {
   const [showMindMap, setShowMindMap] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
   const [showQuiz, setShowQuiz] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);   
+  const [showPicture, setShowPicture] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
   const [difficultyLevel, setDifficultyLevel] = useState<string>('Beginner');
   const [recommendation, setRecommendation] = useState<string | null>(null);
@@ -208,6 +211,7 @@ export default function Home() {
     setShowMindMap(false);
     setShowVideo(false);
     setShowQuiz(false);
+    setShowPicture(false);
 
     if (selectedOutputOption === 'flashcards') {
       setShowFlashcards(true);
@@ -230,10 +234,10 @@ export default function Home() {
       return;
     }
 
-    setIsGenerating(true);
-    setTimeout(() => {
-      setIsGenerating(false);
-    }, 2000);
+    if (selectedOutputOption === 'picture') {
+      setShowPicture(true);
+      return;
+    }
   };
 
   const handleBackFromFlashcards = () => setShowFlashcards(false);
@@ -241,6 +245,7 @@ export default function Home() {
   const handleBackFromMindMap = () => setShowMindMap(false);
   const handleBackFromVideo = () => setShowVideo(false);
   const handleBackFromQuiz = () => setShowQuiz(false);
+  const handleBackFromPicture = () => setShowPicture(false);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -325,6 +330,9 @@ export default function Home() {
   }
   if (showQuiz) {
     return <TextToQuiz inputText={inputText} onBack={handleBackFromQuiz} questionCount={getQuestionCount(difficultyLevel)} difficulty={difficultyLevel} />;
+  }
+  if (showPicture) {
+    return <TextToPicture inputText={inputText} onBack={handleBackFromPicture} />;
   }
 
   return (
