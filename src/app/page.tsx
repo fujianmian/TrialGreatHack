@@ -672,7 +672,7 @@ export default function Home() {
                 className="px-12 py-4 rounded-full bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] text-white font-semibold text-lg hover:from-[#4A2480] hover:to-[#C41A75] transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 <i className={`fas ${isRecommending ? 'fa-spinner fa-spin' : 'fa-bolt'} mr-3`}></i>
-                {isRecommending ? 'Thinking very hard rn......' : 'Don\'t know which to pick? Click here!'}
+                {isRecommending ? 'Analyzing...' : 'Don\'t know which to pick? Click here!'}
               </button>
               {!loading && recommendation && (
                 <p className="mt-2 text-sm text-gray-500 text-center">
