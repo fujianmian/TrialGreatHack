@@ -96,6 +96,9 @@ function generateSummary(text: string) {
   };
 }
 
+import { createBedrockClient } from "@/lib/bedrock";
+import { InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
+
 // AI-powered summary generation using AWS Bedrock
 async function generateAISummary(text: string) {
   console.log("🤖 Attempting AWS Bedrock AI summarization...");
@@ -105,27 +108,6 @@ async function generateAISummary(text: string) {
   console.log("AWS_SECRET_ACCESS_KEY:", process.env.AWS_SECRET_ACCESS_KEY ? "✅ Set" : "❌ Not set");
   
   try {
-    // Dynamic import to handle potential module not found errors
-    const { BedrockRuntimeClient, InvokeModelCommand } = await import('@aws-sdk/client-bedrock-runtime');
-    
-    function createBedrockClient() {
-      console.log("ECS_CONTAINER_METADATA_URI", process.env.ECS_CONTAINER_METADATA_URI);
-      console.log("ECS_CONTAINER_METADATA_URI_V4", process.env.ECS_CONTAINER_METADATA_URI_V4);
-      console.log("region", process.env.REGION);
-
-      if (process.env.ECS_CONTAINER_METADATA_URI || process.env.ECS_CONTAINER_METADATA_URI_V4) {
-        // Running in ECS → rely on Task Role automatically
-        console.log("able to check LOCAL OR ECSSSSSSSSSSSSSSSSSSSSs");
-        return new BedrockRuntimeClient({ region: "us-east-1" });
-      } else {
-        // Running locally → use env credentials
-        console.log("not able to check LOCAL OR ECSSSSSSSSSSSSSSSSSSSSs");
-        return new BedrockRuntimeClient({
-          region: "us-east-1", // or your preferred region
-        });
-      }
-    }
-
     const client = createBedrockClient();
 
     const prompt = `You are an expert at synthesizing information and creating original summaries. Read the following text carefully and create a NEW summary using your OWN WORDS.

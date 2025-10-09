@@ -118,12 +118,14 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || data.error || 'Authentication failed');
+        console.error('Authentication API error:', data);
+        throw new Error(data.error || data.message || 'Authentication failed');
       }
 
       // Expecting backend to return: { idToken, accessToken, refreshToken, expiresIn }
       return data;
     } catch (err: any) {
+      console.error('Authentication network error:', err);
       throw new Error(err.message || 'Network error occurred');
     }
   };

@@ -26,15 +26,11 @@ const nextConfig: NextConfig = {
             key: 'Cache-Control',
             value: 'no-cache, no-store, must-revalidate',
           },
+          {
+            key: 'Content-Security-Policy',
+            value: "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;",
+          },
         ],
-      },
-    ];
-  },
-  async rewrites() {
-    return [
-      {
-        source: '/:path*',
-        destination: '/', // all routes serve index.html
       },
     ];
   },
