@@ -2,7 +2,7 @@ name: Deploy to ECS
 on:
   push:
     branches:
-      - main  # 监听 main 分支 push
+      - main  # 监听 main 分支 push ddwdw
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
