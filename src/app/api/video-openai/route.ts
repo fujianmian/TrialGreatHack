@@ -5,7 +5,7 @@ import { createBedrockClient } from '@/lib/bedrock';
 
 const NOVA_REGION = 'us-east-1';
 // Use the S3 bucket from environment variables
-const S3_BUCKET_NAME = process.env.AWS_S3_BUCKET || 'nova-reel-videos-bucket';
+const S3_BUCKET_NAME = process.env.AWS_S3_BUCKET || 'study-hub-videos-generation';
 const OUTPUT_S3_URI = `s3://${S3_BUCKET_NAME}/`;
 
 export async function POST(request: NextRequest) {
@@ -70,6 +70,8 @@ export async function POST(request: NextRequest) {
 Video Style: ${videoStyle}
 
 CRITICAL REQUIREMENTS - Create VISUALLY STUNNING videos:
+
+0. Strictly need and only 3 video.
 
 1. **Content Analysis**: Deeply analyze the text to identify:
    - Key concepts, themes, and visual metaphors
