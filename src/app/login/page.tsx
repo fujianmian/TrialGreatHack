@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 
 // AWS Cognito Configuration
 const COGNITO_CONFIG = {
-  userPoolId: 'YOUR_USER_POOL_ID', // e.g., 'us-east-1_XXXXXXXXX'
-  clientId: 'YOUR_CLIENT_ID', // e.g., '1234567890abcdefghijklmnop'
-  region: 'YOUR_REGION' // e.g., 'us-east-1'
+  userPoolId: 'ap-southeast-5_7fYn86Mn5',
+  clientId: '7jqp9vjf661kpqlcfmhi1ssn00',
+  region: 'ap-southeast-5'
 };
 
 export default function LoginPage() {
