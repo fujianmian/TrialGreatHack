@@ -35,12 +35,12 @@ const inputMethods: InputMethod[] = [
 ];
 
 const outputOptions: OutputOption[] = [
+  { id: 'picture', name: 'Picture', icon: 'fas fa-image' },
   { id: 'video', name: 'Video', icon: 'fas fa-video' },
   { id: 'flashcards', name: 'Flashcards', icon: 'fas fa-layer-group' },
   { id: 'mindmap', name: 'Mind Map', icon: 'fas fa-brain' },
   { id: 'quiz', name: 'Quiz', icon: 'fas fa-question-circle' },
   { id: 'summary', name: 'Summary', icon: 'fas fa-chart-bar' },
-  { id: 'picture', name: 'Picture', icon: 'fas fa-image' },
 ];
 
 const features: Feature[] = [
@@ -649,7 +649,9 @@ export default function Home() {
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-              {outputOptions.map((option) => (
+              {outputOptions.map((option) => {
+                console.log("Rendering option:", option.name);
+                return (
                 <div
                   key={option.id}
                   className={`text-center p-4 border-2 rounded-xl cursor-pointer transition-all duration-300 hover:scale-105 ${
@@ -662,7 +664,8 @@ export default function Home() {
                   <i className={`${option.icon} text-2xl mb-3 text-[#5E2E8F]`}></i>
                   <p className="text-sm font-medium text-black">{option.name}</p>
                 </div>
-              ))}
+              );
+            })}
             </div>
 
             <div className="text-center mb-6">

@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 
 // AWS Cognito Configuration
 const COGNITO_CONFIG = {
-  userPoolId: 'YOUR_USER_POOL_ID', // e.g., 'us-east-1_XXXXXXXXX'
-  clientId: 'YOUR_CLIENT_ID', // e.g., '1234567890abcdefghijklmnop'
-  region: 'YOUR_REGION' // e.g., 'us-east-1'
+  userPoolId: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || '',
+  clientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || '',
+  region: process.env.NEXT_PUBLIC_AWS_REGION || ''
 };
 
 export default function LoginPage() {
@@ -128,6 +128,20 @@ export default function LoginPage() {
       console.error('Authentication network error:', err);
       throw new Error(err.message || 'Network error occurred');
     }
+  };
+
+  const handleSocialSignIn = (provider: 'Google' | 'Github') => {
+    const cognitoDomain = process.env.NEXT_PUBLIC_COGNITO_DOMAIN;
+    const clientId = COGNITO_CONFIG.clientId;
+    const redirectUri = window.location.origin + '/auth/callback';
+
+    if (!cognitoDomain || !clientId) {
+      setError('Cognito domain or client ID is not configured.');
+      return;
+    }
+
+    const url = `https://${cognitoDomain}/oauth2/authorize?identity_provider=${provider}&response_type=CODE&client_id=${clientId}&redirect_uri=${redirectUri}&scope=email+openid+profile`;
+    window.location.href = url;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -321,10 +335,7 @@ export default function LoginPage() {
             <div className="grid grid-cols-2 gap-4">
               <button
                 type="button"
-                onClick={() => {
-                  // Handle Google login via Cognito
-                  console.log('Google login clicked');
-                }}
+                onClick={() => handleSocialSignIn('Google')}
                 className="py-3 px-4 bg-white/5 border border-white/10 rounded-xl text-white font-medium hover:bg-white/10 transition-all flex items-center justify-center gap-2"
               >
                 <i className="fab fa-google"></i>
@@ -332,10 +343,7 @@ export default function LoginPage() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  // Handle GitHub login via Cognito
-                  console.log('GitHub login clicked');
-                }}
+                onClick={() => handleSocialSignIn('Github')}
                 className="py-3 px-4 bg-white/5 border border-white/10 rounded-xl text-white font-medium hover:bg-white/10 transition-all flex items-center justify-center gap-2"
               >
                 <i className="fab fa-github"></i>
