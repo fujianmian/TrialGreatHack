@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import TextToPicture from './texttopicture';
+import ChatBox from '../chatbox';
+
 
 export default function TextToPicturePage() {
   const [inputText, setInputText] = useState('A beautiful landscape with mountains and a lake.');
@@ -40,6 +42,7 @@ export default function TextToPicturePage() {
           </div>
         </div>
       </div>
+      <ChatBox />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import ChatBox from '../chatbox';
 
 interface SummaryResponse {
   summary: string;
@@ -202,6 +203,7 @@ export default function TextToSummary({ inputText, onBack }: TextToSummaryProps)
           </div>
         </div>
       </div>
+      <ChatBox />
     </div>
   );
 }
