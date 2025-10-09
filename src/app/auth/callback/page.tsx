@@ -1,10 +1,10 @@
 'use client';
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +59,7 @@ export default function AuthCallbackPage() {
 
       // Store the session
       sessionStorage.setItem('cognitoSession', JSON.stringify(session));
-      localStorage.setItem('cognitoSession', JSON.stringify(session)); // Or based on a "remember me" flag
+      localStorage.setItem('cognitoSession', JSON.stringify(session));
 
       // Redirect to the home page
       router.push('/');
@@ -84,5 +84,20 @@ export default function AuthCallbackPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <i className="fas fa-spinner fa-spin text-white text-4xl mb-4"></i>
+          <p className="text-gray-300">Loading...</p>
+        </div>
+      </div>
+    }>
+      <AuthCallbackContent />
+    </Suspense>
   );
 }
