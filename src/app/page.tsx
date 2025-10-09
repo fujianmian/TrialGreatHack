@@ -77,6 +77,7 @@ export default function Home() {
   const [showPicture, setShowPicture] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
+  const [uploadDescription, setUploadDescription] = useState('');
   const [difficultyLevel, setDifficultyLevel] = useState<string>('Beginner');
   const [recommendation, setRecommendation] = useState<string | null>(null);
   
@@ -118,6 +119,12 @@ export default function Home() {
   useEffect(() => {
     checkAuthStatus();
   }, []);
+
+  useEffect(() => {
+    if (selectedInputMethod === 'upload' && uploadedFile) {
+      setInputText(`File Content:\n${fileContent}\n\nDescription:\n${uploadDescription}`);
+    }
+  }, [fileContent, uploadDescription, selectedInputMethod, uploadedFile]);
 
   const handleHistory = () => {
     // Navigate to history page or show history modal
@@ -278,6 +285,23 @@ export default function Home() {
           setFileContent('Failed to extract PDF text.');
           setInputText('');
         }
+      } else if (file.type.startsWith('image/')) {
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+          const response = await fetch('/api/extract-image', {
+            method: 'POST',
+            body: formData,
+          });
+          if (!response.ok) throw new Error('Failed to extract image text');
+          const data = await response.json();
+          setFileContent(data.extractedText);
+          setInputText(data.extractedText);
+        } catch (err) {
+          console.error('Error extracting image text:', err);
+          setFileContent('Failed to extract image text.');
+          setInputText('');
+        }
       }
     }
   };
@@ -286,6 +310,7 @@ export default function Home() {
     setUploadedFile(null);
     setFileContent('');
     setInputText('');
+    setUploadDescription('');
   };
 
   const handleInputMethodChange = (methodId: string) => {
@@ -293,6 +318,7 @@ export default function Home() {
     if (methodId !== 'upload') {
       setUploadedFile(null);
       setFileContent('');
+      setUploadDescription('');
     }
     if (methodId !== 'upload' && methodId !== selectedInputMethod) {
       setInputText('');
@@ -547,45 +573,55 @@ export default function Home() {
             
             <div className="mb-6">
               {selectedInputMethod === 'upload' ? (
-                <div className="w-full min-h-48 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center hover:border-[#5E2E8F] hover:bg-[#5E2E8F]/10 transition-all duration-300 p-4">
-                  {uploadedFile ? (
-                    <div className="text-center p-4">
-                      <div className="flex items-center justify-center mb-4">
-                        <i className="fas fa-file text-4xl text-[#5E2E8F] mr-3"></i>
-                        <div>
-                          <p className="font-semibold text-gray-800">{uploadedFile.name}</p>
-                          <p className="text-sm text-gray-700">
-                            {(uploadedFile.size / 1024).toFixed(1)} KB
-                          </p>
+                <>
+                  <div className="w-full min-h-48 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center hover:border-[#5E2E8F] hover:bg-[#5E2E8F]/10 transition-all duration-300 p-4">
+                    {uploadedFile ? (
+                      <div className="text-center p-4">
+                        <div className="flex items-center justify-center mb-4">
+                          <i className="fas fa-file text-4xl text-[#5E2E8F] mr-3"></i>
+                          <div>
+                            <p className="font-semibold text-gray-800">{uploadedFile.name}</p>
+                            <p className="text-sm text-gray-700">
+                              {(uploadedFile.size / 1024).toFixed(1)} KB
+                            </p>
+                          </div>
                         </div>
+                        <button
+                          onClick={handleRemoveFile}
+                          className="mt-4 px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
+                        >
+                          <i className="fas fa-trash mr-2"></i>
+                          Remove File
+                        </button>
                       </div>
-                      <button
-                        onClick={handleRemoveFile}
-                        className="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
-                      >
-                        <i className="fas fa-trash mr-2"></i>
-                        Remove File
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="text-center w-full">
-                      <i className="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-3"></i>
-                      <p className="text-base font-medium text-black mb-2">
-                        Upload a file to get started
-                      </p>
-                      <label className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] text-white rounded-lg hover:from-[#4A2480] hover:to-[#C41A75] transition-colors cursor-pointer text-sm">
-                        <i className="fas fa-file-upload mr-2"></i>
-                        Choose File
-                        <input
-                          type="file"
-                          accept=".txt,.pdf,.doc,.docx"
-                          onChange={handleFileUpload}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
-                  )}
-                </div>
+                    ) : (
+                      <div className="text-center w-full">
+                        <i className="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-3"></i>
+                        <p className="text-base font-medium text-black mb-2">
+                          Upload a file to get started
+                        </p>
+                        <label className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] text-white rounded-lg hover:from-[#4A2480] hover:to-[#C41A75] transition-colors cursor-pointer text-sm">
+                          <i className="fas fa-file-upload mr-2"></i>
+                          Choose File
+                          <input
+                            type="file"
+                            accept=".txt,.pdf,.doc,.docx,image/*"
+                            onChange={handleFileUpload}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-4">
+                    <textarea
+                      value={uploadDescription}
+                      onChange={(e) => setUploadDescription(e.target.value)}
+                      className="w-full h-24 p-4 border-2 border-gray-200 rounded-xl resize-y text-base text-black focus:outline-none focus:border-[#5E2E8F] focus:ring-4 focus:ring-[#5E2E8F]/20 transition-all duration-300"
+                      placeholder="Add a description or instructions for the AI..."
+                    />
+                  </div>
+                </>
               ) : (
                 <textarea
                   value={inputText}
