@@ -99,7 +99,7 @@ function generateSummary(text: string) {
 import { createBedrockClient } from "@/lib/bedrock";
 import { InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
 
-// AI-powered summary generation using AWS Bedrock
+// AI-powered summary generation using AWS Bedrock trigger
 async function generateAISummary(text: string) {
   console.log("🤖 Attempting AWS Bedrock AI summarization...");
   console.log("🔍 Environment check:");
