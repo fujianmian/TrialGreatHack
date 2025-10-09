@@ -137,30 +137,42 @@ ${text}
 
 Remember: Every word in your response must be YOUR paraphrase, not copied text.`;
 
+    // ✅ CORRECT FORMAT FOR AMAZON NOVA PRO
     const input = {
       modelId: 'amazon.nova-pro-v1:0',
       contentType: 'application/json',
       accept: 'application/json',
       body: JSON.stringify({
-        inputText: prompt,
-        textGenerationConfig: {
-          maxTokenCount: 1500, // ✅ correct name for token limit
-          stopSequences: [],
-          temperature: 0.7,     // ✅ supported here
-          topP: 0.9
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                text: prompt
+              }
+            ]
+          }
+        ],
+        inferenceConfig: {
+          max_new_tokens: 1500,
+          temperature: 0.7,
+          top_p: 0.9
         }
       })
     };
-    console.log("🧾 Final request body:", input);
-
+    
+    console.log("🧾 Final request body:", JSON.stringify(JSON.parse(input.body), null, 2));
 
     const command = new InvokeModelCommand(input);
     const response = await client.send(command);
     
     const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-    const aiResponse = responseBody.content[0].text;
+    
+    // ✅ CORRECT RESPONSE PARSING FOR NOVA PRO
+    const aiResponse = responseBody.output.message.content[0].text;
 
     console.log("✅ AWS Bedrock response received");
+    console.log("📝 AI Response:", aiResponse);
 
     // Parse the JSON response
     try {
