@@ -35,8 +35,8 @@ export async function POST(request: NextRequest) {
       .join('\n');
 
     return NextResponse.json({ extractedText });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error processing image:', error);
-    return NextResponse.json({ error: 'Failed to process the image.' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to process the image.', details: error.message || 'An unknown error occurred.' }, { status: 500 });
   }
 }
