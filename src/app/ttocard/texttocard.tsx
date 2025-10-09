@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import ChatBox from '../chatbox';
 
 interface Flashcard {
   id: number;
@@ -505,6 +506,7 @@ export default function TextToCard({ inputText, onBack, questionCount, difficult
           </div>
         </div>
       </div>
+      <ChatBox />
     </div>
   );
 }

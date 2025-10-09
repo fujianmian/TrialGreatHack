@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import ChatBox from '../chatbox';
 
 interface QuizQuestion {
   id: number;
@@ -510,6 +511,7 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
           </div>
         </div>
       </div>
+      <ChatBox />
     </div>
   );
 }

@@ -110,50 +110,69 @@ async function generateAISummary(text: string) {
   try {
     const client = createBedrockClient();
 
-    const prompt = `Please provide a comprehensive summary of the following text.
+    const prompt = `You are an expert at synthesizing information and creating original summaries. Read the following text carefully and create a NEW summary using your OWN WORDS.
 
-Requirements:
-- Create a clear, concise summary that captures the main ideas
-- Extract 3-5 key points as bullet points
-- Maintain the original meaning and context
-- Use clear, readable language
-- Keep the summary significantly shorter than the original
+CRITICAL INSTRUCTIONS:
+- DO NOT copy any complete sentences from the original text
+- DO NOT just cut and paste phrases from the original
+- UNDERSTAND the key concepts and EXPLAIN them in your own way
+- PARAPHRASE everything - use different sentence structures and vocabulary
+- Create a cohesive summary that flows naturally in YOUR voice
+- Extract key points and present them as bullet points, but REWRITE them in your own words
 
-Return as JSON:
+Your goal is to demonstrate understanding by expressing the same ideas differently.
+
+Return ONLY valid JSON in this exact format:
 {
-  "summary": "Your comprehensive summary here",
+  "summary": "Your paraphrased summary here (2-4 sentences, completely rewritten)",
   "keyPoints": [
-    "Key point 1",
-    "Key point 2",
-    "Key point 3"
+    "First key concept explained in your own words",
+    "Second key concept explained in your own words",
+    "Third key concept explained in your own words"
   ]
 }
 
 Text to summarize:
-${text}`;
+${text}
 
+Remember: Every word in your response must be YOUR paraphrase, not copied text.`;
+
+    // ✅ CORRECT FORMAT FOR AMAZON NOVA PRO
     const input = {
       modelId: 'amazon.nova-pro-v1:0',
       contentType: 'application/json',
       accept: 'application/json',
       body: JSON.stringify({
-        anthropic_version: 'bedrock-2023-05-31',
         messages: [
           {
-            role: 'user',
-            content: prompt
+            role: "user",
+            content: [
+              {
+                text: prompt
+              }
+            ]
           }
-        ]
+        ],
+        inferenceConfig: {
+          max_new_tokens: 1500,
+          temperature: 0.7,
+          top_p: 0.9
+        }
       })
     };
+    
+    console.log("🧾 Final request body:", JSON.stringify(JSON.parse(input.body), null, 2));
 
     const command = new InvokeModelCommand(input);
     const response = await client.send(command);
     
     const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-    const aiResponse = responseBody.content[0].text;
+    
+    // ✅ CORRECT RESPONSE PARSING FOR NOVA PRO
+    const aiResponse = responseBody.output.message.content[0].text;
 
     console.log("✅ AWS Bedrock response received");
+    console.log("📝 AI Response:", aiResponse);
 
     // Parse the JSON response
     try {
