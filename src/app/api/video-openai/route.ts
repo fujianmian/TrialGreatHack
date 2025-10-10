@@ -2,17 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BedrockRuntimeClient, StartAsyncInvokeCommand, GetAsyncInvokeCommand } from '@aws-sdk/client-bedrock-runtime';
 import OpenAI from 'openai';
 import { createBedrockClient } from '@/lib/bedrock';
+import { createActivity } from '@/lib/db';
 
 const NOVA_REGION = 'us-east-1';
 // Use the S3 bucket from environment variables
 const S3_BUCKET_NAME = process.env.AWS_S3_BUCKET || 'study-hub-videos-generation';
 const OUTPUT_S3_URI = `s3://${S3_BUCKET_NAME}/`;
 
+// Track processed requests to prevent duplicates
+const processedRequests = new Set<string>();
+
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+
   try {
     console.log('API route hit');
-    const { prompt, action, invocationArn, text, style } = await request.json();
-    console.log('Received request:', { prompt, action, invocationArn, text, style });
+    const { prompt, action, invocationArn, text, style, userEmail: requestUserEmail, requestId } = await request.json();
+    const userEmail = requestUserEmail || 'anonymous@example.com';
+    const videoRequestId = requestId || `${Date.now()}-${Math.random()}`;
+    console.log('Received request:', { prompt, action, invocationArn, text, style, userEmail, requestId: videoRequestId });
 
     const client = createBedrockClient();
 
@@ -49,6 +57,22 @@ export async function POST(request: NextRequest) {
 
     // Handle OpenAI script generation + Nova Reel video generation
     if (text) {
+      // Check for duplicate requests (only for video generation, not status checks)
+      if (processedRequests.has(videoRequestId)) {
+        console.log(`⚠️ Duplicate video request detected: ${videoRequestId}`);
+        return NextResponse.json({ 
+          error: "Duplicate request detected" 
+        }, { status: 409 });
+      }
+
+      // Mark this request as being processed
+      processedRequests.add(videoRequestId);
+
+      // Clean up old request IDs after 5 minutes
+      setTimeout(() => {
+        processedRequests.delete(videoRequestId);
+      }, 5 * 60 * 1000);
+
       const videoStyle = style || "educational";
 
       if (!text.trim()) {
@@ -281,6 +305,53 @@ ${text}`;
         estimatedTime: '1-3 minutes per video',
         s3Bucket: S3_BUCKET_NAME
       };
+
+      // Calculate duration
+      const duration = Date.now() - startTime;
+
+      // Create a simple title from the first sentence
+      const firstSentence = text.split(/[.!?]+/)[0].trim();
+      const title = firstSentence.length > 50 ? 
+        firstSentence.substring(0, 47) + '...' : 
+        firstSentence;
+
+      // Save activity to database
+      try {
+        const activityId = await createActivity({
+          userEmail: userEmail,
+          type: 'video',
+          title: title,
+          inputText: text.substring(0, 500), // Store first 500 chars
+          result: {
+            title: result.title,
+            duration: result.duration,
+            style: result.style,
+            totalShots: result.totalShots,
+            successfulJobs: result.successfulJobs,
+            failedJobs: result.failedJobs
+          },
+          status: 'completed',
+          duration: duration,
+          metadata: {
+            style: videoStyle,
+            model: 'OpenAI + Nova Reel',
+            totalShots: videoScript.shots.length,
+            successfulJobs: videoJobs.length,
+            failedJobs: failedJobs.length,
+            tags: [
+              videoStyle.charAt(0).toUpperCase() + videoStyle.slice(1),
+              `${videoJobs.length} Videos`,
+              'AI Generated'
+            ],
+            originalTitle: title
+          }
+        });
+
+        console.log(`✅ Video activity saved with ID: ${activityId}`);
+      } catch (dbError) {
+        console.error('❌ Failed to save video activity to database:', dbError);
+        // Don't fail the request if database save fails
+      }
 
       return NextResponse.json({ 
         message: `🎥 Started ${videoJobs.length} video generation jobs (${failedJobs.length} failed)`,

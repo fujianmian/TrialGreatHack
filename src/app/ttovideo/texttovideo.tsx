@@ -48,6 +48,7 @@ interface MultiVideoResponse {
 interface TextToVideoProps {
   inputText: string;
   onBack: () => void;
+  userEmail?: string;
 }
 
 interface VideoPlayerProps {
@@ -115,7 +116,7 @@ const VideoPlayer = ({ video, index, onError }: VideoPlayerProps) => {
   );
 };
 
-export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
+export default function TextToVideo({ inputText, onBack, userEmail }: TextToVideoProps) {
   const [videoData, setVideoData] = useState<MultiVideoResponse | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,8 +125,10 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [allVideosComplete, setAllVideosComplete] = useState(false);
   
-  // Refs to prevent infinite loops
+  // Refs to prevent infinite loops and duplicate generation
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hasGeneratedRef = useRef(false);
+  const generatingRef = useRef(false);
   const statusCheckCountRef = useRef(0);
   const renderCountRef = useRef(0);
 
@@ -143,17 +146,34 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
   }
 
   const generateVideo = useCallback(async () => {
+    // Prevent duplicate generation
+    if (generatingRef.current || hasGeneratedRef.current) {
+      console.log('[TextToVideo] Video generation already in progress or completed, skipping...');
+      return;
+    }
+    
+    generatingRef.current = true;
     console.log('🎬 Starting video generation...');
     setIsGenerating(true);
     setError(null);
 
     try {
+      // Generate unique request ID
+      const requestId = `video-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      
+      console.log(`[TextToVideo] Starting video generation with requestId: ${requestId}`);
+      
       const response = await fetch('/api/video-openai', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ text: inputText, style: selectedStyle }),
+        body: JSON.stringify({ 
+          text: inputText, 
+          style: selectedStyle,
+          userEmail: userEmail || 'anonymous@example.com',
+          requestId: requestId
+        }),
       });
 
       if (!response.ok) {
@@ -162,19 +182,24 @@ export default function TextToVideo({ inputText, onBack }: TextToVideoProps) {
 
       const data = await response.json();
       console.log("🎬 Videos generation started:", data.result);
+      console.log('[TextToVideo] Video generation successful');
       setVideoData(data.result);
       
       // Start checking status of all video jobs
       if (data.result.videoJobs && data.result.videoJobs.length > 0) {
         startStatusChecking(data.result.videoJobs);
       }
+      
+      hasGeneratedRef.current = true;
     } catch (err) {
       console.error('❌ Generation error:', err);
+      console.error('[TextToVideo] Error generating video:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsGenerating(false);
+      generatingRef.current = false;
     }
-  }, [inputText, selectedStyle]);
+  }, [inputText, selectedStyle, userEmail]);
 
   const checkVideoStatus = async (invocationArn: string) => {
     try {

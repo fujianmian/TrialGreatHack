@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import { createActivity } from "@/lib/db";
+
+// Store request IDs to prevent duplicate saves
+const processedRequests = new Set<string>();
 
 export async function POST(req: Request) {
   try {
@@ -6,10 +10,24 @@ export async function POST(req: Request) {
     const text = body.text || "";
     const questionCount = body.questionCount || 5;
     const difficulty = body.difficulty || "Beginner";
+    const userEmail = body.userEmail || "anonymous@example.com";
+    const requestId = body.requestId || `${Date.now()}-${Math.random()}`;
+
+    // Check if this request was already processed
+    if (processedRequests.has(requestId)) {
+      console.log('⚠️ Duplicate flashcard request detected, skipping...');
+      return NextResponse.json({ error: "Duplicate request" }, { status: 400 });
+    }
+    processedRequests.add(requestId);
+
+    // Clean up old request IDs after 5 minutes
+    setTimeout(() => processedRequests.delete(requestId), 300000);
 
     if (!text.trim()) {
       return NextResponse.json({ error: "Article content cannot be empty" }, { status: 400 });
     }
+
+    const startTime = Date.now();
 
     // Check if AWS credentials are available
     const hasAWSCredentials = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY;
@@ -31,6 +49,41 @@ export async function POST(req: Request) {
       console.log("💡 To use AI generation, add AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY to .env.local");
       flashcards = generateFlashcards(text, questionCount, difficulty);
       console.log("✅ Algorithm generation complete, generated", flashcards.length, "flashcards");
+    }
+
+    const duration = Date.now() - startTime;
+
+    // 💾 Save to database
+    try {
+      // Create a simple title from the first sentence
+      const firstSentence = text.split(/[.!?]+/)[0].trim();
+      const title = firstSentence.length > 50 ? 
+        firstSentence.substring(0, 47) + '...' : 
+        firstSentence;
+
+      const activityId = await createActivity({
+        userEmail: userEmail,
+        type: 'flashcard',
+        title: title,
+        inputText: text.substring(0, 500), // Store first 500 chars
+        result: {
+          flashcards: flashcards
+        },
+        status: 'completed',
+        duration: duration,
+        metadata: {
+          difficulty: difficulty,
+          questionCount: questionCount,
+          cardCount: flashcards.length,
+          tags: [`${difficulty}`, `${flashcards.length} Cards`],
+          originalTitle: title
+        }
+      });
+      
+      console.log('✅ Flashcards saved to database with ID:', activityId);
+    } catch (dbError) {
+      console.error('❌ Failed to save flashcards to database:', dbError);
+      // Don't fail the request if database save fails
     }
 
     return NextResponse.json({ result: flashcards });
@@ -249,30 +302,60 @@ function findConceptContext(term: string, text: string): string {
 function generateConceptExplanation(concept: {term: string, category: string, context: string}, text: string): string {
   const { term, context } = concept;
   
-  if (context) {
-    // Create a clear, contextual explanation
-    const words = context.split(' ');
-    const termIndex = words.findIndex(w => w.toLowerCase().includes(term.toLowerCase()));
+  // Find the complete sentence containing the term
+  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 10);
+  
+  for (const sentence of sentences) {
+    const lowerSentence = sentence.toLowerCase();
+    const lowerTerm = term.toLowerCase();
     
-    if (termIndex !== -1) {
-      // Extract surrounding context for better understanding
-      const start = Math.max(0, termIndex - 2);
-      const end = Math.min(words.length, termIndex + 3);
-      const surroundingContext = words.slice(start, end).join(' ');
+    if (lowerSentence.includes(lowerTerm)) {
+      // Clean up the sentence
+      let explanation = sentence.trim();
       
-      return `In this context: "${surroundingContext.trim()}"`;
+      // If sentence is too long, try to extract the most relevant part
+      if (explanation.length > 150) {
+        // Find the term position and extract surrounding context
+        const termIndex = lowerSentence.indexOf(lowerTerm);
+        const start = Math.max(0, termIndex - 50);
+        const end = Math.min(explanation.length, termIndex + 100);
+        explanation = explanation.substring(start, end);
+        
+        // Clean up partial words at edges
+        if (start > 0) {
+          const firstSpace = explanation.indexOf(' ');
+          if (firstSpace > 0) explanation = explanation.substring(firstSpace + 1);
+        }
+        if (end < sentence.length) {
+          const lastSpace = explanation.lastIndexOf(' ');
+          if (lastSpace > 0) explanation = explanation.substring(0, lastSpace);
+        }
+        
+        // Add ellipsis if needed
+        if (start > 0) explanation = '...' + explanation;
+        if (end < sentence.length) explanation = explanation + '...';
+      }
+      
+      return explanation;
     }
-    
-    return `As described: "${context.trim()}"`;
   }
   
-  // Fallback explanation
-  const termCount = text.toLowerCase().split(term.toLowerCase()).length - 1;
-  if (termCount > 1) {
-    return `"${term}" is a key concept mentioned ${termCount} times in the text, indicating its importance to the topic.`;
+  // If no direct sentence found, use context
+  if (context && context.length > 20) {
+    return context.trim();
   }
   
-  return `"${term}" is an important term that appears in this content.`;
+  // Final fallback - find any mention of the term with surrounding words
+  const words = text.split(/\s+/);
+  for (let i = 0; i < words.length; i++) {
+    if (words[i].toLowerCase().includes(term.toLowerCase())) {
+      const start = Math.max(0, i - 5);
+      const end = Math.min(words.length, i + 10);
+      return words.slice(start, end).join(' ');
+    }
+  }
+  
+  return `${term} is an important concept in this text.`;
 }
 
 // Categorize a term based on its context

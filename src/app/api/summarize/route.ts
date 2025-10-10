@@ -1,25 +1,96 @@
 import { NextResponse } from "next/server";
+import { createActivity } from '@/lib/db';
+
+// Track processed requests to prevent duplicates
+const processedRequests = new Set<string>();
 
 export async function POST(req: Request) {
+  const startTime = Date.now();
+
   try {
     const body = await req.json();
     const text = body.text || "";
+    const userEmail = body.userEmail || 'anonymous@example.com';
+    const requestId = body.requestId || `${Date.now()}-${Math.random()}`;
+
+    // Check for duplicate requests
+    if (processedRequests.has(requestId)) {
+      console.log(`⚠️ Duplicate summary request detected: ${requestId}`);
+      return NextResponse.json({ 
+        error: "Duplicate request detected" 
+      }, { status: 409 });
+    }
+
+    // Mark this request as being processed
+    processedRequests.add(requestId);
+
+    // Clean up old request IDs after 5 minutes
+    setTimeout(() => {
+      processedRequests.delete(requestId);
+    }, 5 * 60 * 1000);
 
     if (!text.trim()) {
       return NextResponse.json({ error: "Text content cannot be empty" }, { status: 400 });
     }
 
     // Try AI generation first, fallback to algorithm
-    let summary;
+    let summary: any = null;
+    let usedAI = false;
+    
     try {
       console.log("🤖 Attempting AWS Bedrock AI summarization...");
       summary = await generateAISummary(text);
+      usedAI = true;
       console.log("✅ AI summarization successful");
     } catch (aiError) {
       console.warn("⚠️ AI summarization failed, using fallback:", aiError instanceof Error ? aiError.message : String(aiError));
       console.log("🔄 Switching to algorithm-based summarization...");
       summary = generateSummary(text);
+      usedAI = false;
       console.log("✅ Fallback summarization complete");
+    }
+
+    // Calculate duration
+    const duration = Date.now() - startTime;
+
+    // Create a simple title from the first sentence
+    const firstSentence = text.split(/[.!?]+/)[0].trim();
+    const title = firstSentence.length > 50 ? 
+      firstSentence.substring(0, 47) + '...' : 
+      firstSentence;
+
+    // Save activity to database
+    try {
+      const activityId = await createActivity({
+        userEmail: userEmail,
+        type: 'summary',
+        title: title,
+        inputText: text.substring(0, 500), // Store first 500 chars
+        result: {
+          summary: summary.summary,
+          keyPoints: summary.keyPoints,
+          wordCount: summary.wordCount,
+          originalWordCount: summary.originalWordCount
+        },
+        status: 'completed',
+        duration: duration,
+        metadata: {
+          originalWordCount: summary.originalWordCount,
+          summaryWordCount: summary.wordCount,
+          model: usedAI ? 'Nova Pro' : 'Algorithm',
+          tags: [
+            `${summary.originalWordCount} words → ${summary.wordCount} words`,
+            usedAI ? 'AI Generated' : 'Algorithm'
+          ],
+          originalTitle: title,
+          usedAI
+        }
+      });
+
+      console.log(`✅ Summary activity saved with ID: ${activityId}`);
+    } catch (dbError) {
+      console.error('❌ Failed to save summary activity to database:', dbError);
+      // Don't fail the request if database save fails
     }
 
     return NextResponse.json({ result: summary });

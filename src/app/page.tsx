@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import TextToCard from './ttocard/texttocard';
 import TextToSummary from './ttosummary/texttosummary';
 import TextToMap from './ttomap/texttomap';
@@ -62,6 +63,7 @@ const features: Feature[] = [
 ];
 
 export default function Home() {
+  const router = useRouter();
   const [selectedInputMethod, setSelectedInputMethod] = useState('text');
   const [selectedOutputOption, setSelectedOutputOption] = useState<string>('');
   const [inputText, setInputText] = useState('A cute cat playing with a ball of yarn.');
@@ -88,17 +90,7 @@ export default function Home() {
   
   const mainContentRef = useRef<HTMLDivElement>(null);
 
-  // Add Font Awesome to head
-  useEffect(() => {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css';
-    document.head.appendChild(link);
-
-    return () => {
-      document.head.removeChild(link);
-    };
-  }, []);
+  // Font Awesome is now loaded globally in layout.tsx
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -127,9 +119,7 @@ export default function Home() {
   }, [fileContent, uploadDescription, selectedInputMethod, uploadedFile]);
 
   const handleHistory = () => {
-    // Navigate to history page or show history modal
-    console.log('Navigating to history');
-    // window.location.href = '/history';
+    router.push('/history');
   };
 
   const checkAuthStatus = async () => {
@@ -344,22 +334,22 @@ export default function Home() {
   };
 
   if (showFlashcards) {
-    return <TextToCard inputText={inputText} onBack={handleBackFromFlashcards} questionCount={getQuestionCount(difficultyLevel)} difficulty={difficultyLevel} />;
+    return <TextToCard inputText={inputText} onBack={handleBackFromFlashcards} questionCount={getQuestionCount(difficultyLevel)} difficulty={difficultyLevel} userEmail={user?.email || 'anonymous@example.com'} />;
   }
   if (showSummary) {
-    return <TextToSummary inputText={inputText} onBack={handleBackFromSummary} />;
+    return <TextToSummary inputText={inputText} onBack={handleBackFromSummary} userEmail={user?.email || 'anonymous@example.com'} />;
   }
   if (showMindMap) {
-    return <TextToMap inputText={inputText} onBack={handleBackFromMindMap} />;
+    return <TextToMap inputText={inputText} onBack={handleBackFromMindMap} userEmail={user?.email || 'anonymous@example.com'} />;
   }
   if (showVideo) {
-    return <TextToVideo inputText={inputText} onBack={handleBackFromVideo} />;
+    return <TextToVideo inputText={inputText} onBack={handleBackFromVideo} userEmail={user?.email || 'anonymous@example.com'} />;
   }
   if (showQuiz) {
-    return <TextToQuiz inputText={inputText} onBack={handleBackFromQuiz} questionCount={getQuestionCount(difficultyLevel)} difficulty={difficultyLevel} />;
+    return <TextToQuiz inputText={inputText} onBack={handleBackFromQuiz} questionCount={getQuestionCount(difficultyLevel)} difficulty={difficultyLevel} userEmail={user?.email || 'anonymous@example.com'} />;
   }
   if (showPicture) {
-    return <TextToPicture inputText={inputText} onBack={handleBackFromPicture} />;
+    return <TextToPicture inputText={inputText} onBack={handleBackFromPicture} userEmail={user?.email || 'anonymous@example.com'} />;
   }
 
   return (
