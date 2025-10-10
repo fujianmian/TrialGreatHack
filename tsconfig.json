@@ -28,6 +28,6 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "declarations.d.ts"
-  ],
+, "test-db.js"  ],
   "exclude": ["node_modules"]
 }

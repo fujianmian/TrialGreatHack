@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import ChatBox from '../chatbox';
 
 interface QuizQuestion {
@@ -17,13 +17,14 @@ interface TextToQuizProps {
   onBack: () => void;
   questionCount: number;
   difficulty: string;
+  userEmail: string;
 }
 
 interface AIResponse {
   result: QuizQuestion[];
 }
 
-export default function TextToQuiz({ inputText, onBack, questionCount, difficulty }: TextToQuizProps) {
+export default function TextToQuiz({ inputText, onBack, questionCount, difficulty, userEmail }: TextToQuizProps) {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
@@ -34,6 +35,8 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<number>>(new Set());
   const [userAnswers, setUserAnswers] = useState<Map<number, number>>(new Map());
+  const hasGeneratedRef = useRef(false);
+  const generatingRef = useRef(false);
 
   // Logger for props
   useEffect(() => {
@@ -44,9 +47,20 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
   }, []);
 
   const generateQuiz = useCallback(async () => {
+    // Prevent duplicate calls
+    if (generatingRef.current || hasGeneratedRef.current) {
+      console.log('[TextToQuiz] Quiz generation already in progress or completed, skipping...');
+      return;
+    }
+    
+    generatingRef.current = true;
     setIsGenerating(true);
     setError(null);
     console.log('[TextToQuiz] Starting quiz generation', { inputText, questionCount, difficulty });
+    
+    // Generate a unique request ID to prevent duplicates
+    const requestId = `${Date.now()}-${Math.random()}-${inputText.substring(0, 20)}`;
+    
     try {
       const response = await fetch('/api/quiz', {
         method: 'POST',
@@ -56,7 +70,9 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
         body: JSON.stringify({
           text: inputText,
           questionCount: questionCount,
-          difficulty: difficulty
+          difficulty: difficulty,
+          userEmail: userEmail,
+          requestId: requestId
         }),
       });
 
@@ -71,11 +87,14 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
       console.log('[TextToQuiz] API response received:', data);
       setQuestions(data.result);
       setIsGenerating(false);
+      hasGeneratedRef.current = true;
+      generatingRef.current = false;
       console.log('[TextToQuiz] Quiz questions set:', data.result);
     } catch (err) {
       console.error('[TextToQuiz] Error generating quiz:', err);
       setError(err instanceof Error ? err.message : 'Failed to generate quiz');
       setIsGenerating(false);
+      generatingRef.current = false;
       // Fallback to mock data if API fails to triggeffeee
       const generateFallbackQuestions = (count: number, difficulty: string): QuizQuestion[] => {
         const baseQuestions = [
@@ -139,7 +158,8 @@ export default function TextToQuiz({ inputText, onBack, questionCount, difficult
       console.log('[TextToQuiz] inputText changed, generating quiz...');
       generateQuiz();
     }
-  }, [inputText, generateQuiz]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputText]);
 
   const handleAnswerSelect = (answerIndex: number) => {
     if (showResult || quizCompleted) return;

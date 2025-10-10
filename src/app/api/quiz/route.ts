@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { BedrockClient } from "@aws-sdk/client-bedrock";
+import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
+import { createActivity } from "@/lib/db";
+import { createBedrockClient } from "@/lib/bedrock";
+
+// Store request IDs to prevent duplicate saves
+const processedRequests = new Set<string>();
 
 export async function POST(req: Request) {
   try {
@@ -7,10 +12,24 @@ export async function POST(req: Request) {
     const text = body.text || "";
     const questionCount = body.questionCount || 5;
     const difficulty = body.difficulty || "Beginner";
+    const userEmail = body.userEmail || "anonymous@example.com"; // Get user email from request
+    const requestId = body.requestId || `${Date.now()}-${Math.random()}`;
+
+    // Check if this request was already processed
+    if (processedRequests.has(requestId)) {
+      console.log('⚠️ Duplicate request detected, skipping...');
+      return NextResponse.json({ error: "Duplicate request" }, { status: 400 });
+    }
+    processedRequests.add(requestId);
+
+    // Clean up old request IDs after 5 minutes
+    setTimeout(() => processedRequests.delete(requestId), 300000);
 
     if (!text.trim()) {
       return NextResponse.json({ error: "Article content cannot be empty" }, { status: 400 });
     }
+
+    const startTime = Date.now();
 
     // Try AI generation first, fallback to algorithm
     let questions;
@@ -25,6 +44,41 @@ export async function POST(req: Request) {
       console.log("✅ Fallback generation complete, generated", questions.length, "quiz questions");
     }
 
+    const duration = Date.now() - startTime;
+
+    // 💾 Save to database
+    try {
+      // Create a simple title from the first sentence
+      const firstSentence = text.split(/[.!?]+/)[0].trim();
+      const title = firstSentence.length > 50 ? 
+        firstSentence.substring(0, 47) + '...' : 
+        firstSentence;
+
+      const activityId = await createActivity({
+        userEmail: userEmail,
+        type: 'quiz',
+        title: title,
+        inputText: text.substring(0, 500), // Store first 500 chars
+        result: {
+          questions: questions
+        },
+        status: 'completed',
+        duration: duration,
+        metadata: {
+          difficulty: difficulty,
+          questionCount: questionCount,
+          score: null,
+          tags: [`${difficulty}`, `${questionCount} Questions`],
+          originalTitle: title
+        }
+      });
+      
+      console.log('✅ Quiz saved to database with ID:', activityId);
+    } catch (dbError) {
+      console.error('❌ Failed to save quiz to database:', dbError);
+      // Don't fail the request if database save fails
+    }
+
     return NextResponse.json({ result: questions });
 
   } catch (error: unknown) {
@@ -36,322 +90,324 @@ export async function POST(req: Request) {
   }
 }
 
-// Generate quiz questions from text content - simple algorithm
-function generateQuiz(text: string, questionCount: number, difficulty: string) {
-  const questions: Array<{id: number, question: string, options: string[], correctAnswer: number, explanation: string, category: string}> = [];
-  
-  // Extract sentences for question generation
-  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 20);
-  
-  if (sentences.length === 0) {
+interface QuizQuestion {
+  id: number;
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  explanation: string;
+  category: string;
+}
+
+async function generateAIQuiz(text: string, questionCount: number, difficulty: string): Promise<QuizQuestion[]> {
+  const client = createBedrockClient();
+
+  const prompt = `Generate a quiz with ${questionCount} multiple-choice questions based on the following text. 
+The difficulty level should be ${difficulty}.
+
+Text: ${text}
+
+For each question:
+1. Create a clear, concise question
+2. Provide 4 options with one correct answer
+3. Include a brief explanation for the correct answer
+4. Assign a category (General, Technical, or Advanced)
+
+Format the response as a JSON array with objects containing:
+{
+  "id": number,
+  "question": string,
+  "options": string[],
+  "correctAnswer": number (0-3),
+  "explanation": string,
+  "category": string
+}`;
+
+  try {
+    const command = new InvokeModelCommand({
+      modelId: "anthropic.claude-v2",
+      contentType: "application/json",
+      accept: "application/json",
+      body: JSON.stringify({
+        prompt: `\${prompt}\n\nHuman: Please generate the quiz questions as specified.\n\nAssistant: Here are the quiz questions in the requested JSON format:`,
+        max_tokens: 2000,
+        temperature: 0.7,
+        top_p: 0.9,
+      }),
+    });
+
+    const response = await client.send(command);
+    const responseBody = new TextDecoder().decode(response.body);
+    const parsedResponse = JSON.parse(responseBody);
+    
+    // Extract the JSON array from the response
+    const jsonMatch = parsedResponse.completion.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      throw new Error("Failed to parse AI response");
+    }
+
+    const questions: QuizQuestion[] = JSON.parse(jsonMatch[0]);
     return questions;
+  } catch (error) {
+    console.error("Error generating quiz with AI:", error);
+    throw error;
+  }
+}
+
+function generateQuiz(text: string, questionCount: number, difficulty: string): QuizQuestion[] {
+  // Split text into sentences - be lenient to ensure enough material
+  const sentences = text.split(/[.!?]+/).filter(s => {
+    const trimmed = s.trim();
+    const wordCount = trimmed.split(/\s+/).filter(w => w.length > 0).length;
+    return wordCount >= 3 && trimmed.length > 15; // At least 3 words and 15 characters
+  });
+  
+  if (sentences.length < 1) {
+    throw new Error("Text is too short to generate meaningful questions. Please provide a longer text.");
   }
 
-  // Generate the exact requested number of questions
-  for (let i = 0; i < questionCount; i++) {
-    // Cycle through sentences if we need more questions than sentences
-    const sentenceIndex = i % sentences.length;
-    const sentence = sentences[sentenceIndex].trim();
-    
-    if (sentence.length < 10) continue;
-    
-    // Extract key terms from the sentence
-    const words = sentence.toLowerCase()
-      .replace(/[^\w\s]/g, '')
-      .split(/\s+/)
-      .filter(word => word.length > 3 && !isUnimportantWord(word));
-    
-    if (words.length === 0) continue;
-    
-    const keyWord = words[Math.floor(Math.random() * words.length)];
-    
-    // Create different question types based on difficulty
-    let question, options, explanation, category;
-    
-    if (difficulty === 'Beginner') {
-      question = `What is the main concept related to "${keyWord}" in the text?`;
-      options = [
-        `The concept involves ${keyWord} and its applications`,
-        `It's a technical term related to ${keyWord}`,
-        `The text discusses ${keyWord} in detail`,
-        `It refers to the importance of ${keyWord}`
-      ];
-      explanation = `The text discusses ${keyWord} and its relevance to the main topic.`;
-      category = "General";
-    } else if (difficulty === 'Intermediate') {
-      question = `How does "${keyWord}" relate to the overall topic discussed?`;
-      options = [
-        `${keyWord} is a fundamental concept that supports the main ideas`,
-        `${keyWord} provides context for understanding the broader subject`,
-        `${keyWord} is mentioned as an example of the main concepts`,
-        `${keyWord} helps explain the key principles in the text`
-      ];
-      explanation = `The text uses ${keyWord} to illustrate and support the main concepts being discussed.`;
-      category = "Conceptual";
-    } else { // Advanced
-      question = `What is the significance of "${keyWord}" in the context of this content?`;
-      options = [
-        `${keyWord} represents a critical component that enables the main functionality`,
-        `${keyWord} serves as a foundational element for the advanced concepts`,
-        `${keyWord} demonstrates the complexity of the subject matter`,
-        `${keyWord} illustrates the practical application of theoretical principles`
-      ];
-      explanation = `The text positions ${keyWord} as a key element that demonstrates the depth and complexity of the subject matter.`;
-      category = "Advanced";
-    }
-    
-    questions.push({
-      id: i + 1,
-      question: question,
-      options: options,
-      correctAnswer: 0,
-      explanation: explanation,
-      category: category
+  // Extract important nouns, verbs, and adjectives
+  const importantWords = text.toLowerCase()
+    .split(/\s+/)
+    .map(word => word.replace(/[^a-z]/gi, ''))
+    .filter(word => {
+      return !isUnimportantWord(word) && word.length >= 3; // Focus on meaningful words (3+ chars)
     });
+
+  const uniqueWords = Array.from(new Set(importantWords));
+  const questions: QuizQuestion[] = [];
+  const usedKeyWords = new Set<string>();
+  const usedSentences = new Set<number>();
+  
+  // Determine question difficulty
+  let category = "General";
+  if (difficulty === "Intermediate") {
+    category = "Technical";
+  } else if (difficulty === "Advanced") {
+    category = "Advanced";
   }
   
+  // Try to generate questions from different parts of the text
+  let attempts = 0;
+  const maxAttempts = Math.max(sentences.length * 5, questionCount * 10); // Ensure enough attempts
+  
+  while (questions.length < questionCount && attempts < maxAttempts) {
+    attempts++;
+    
+    // Pick a sentence we haven't used yet, or loop back to reuse sentences
+    const availableSentences = sentences
+      .map((_, idx) => idx)
+      .filter(idx => !usedSentences.has(idx));
+    
+    // If we've used all sentences but still need more questions, clear the used sentences
+    if (availableSentences.length === 0 && questions.length < questionCount) {
+      usedSentences.clear(); // Allow reusing sentences with different words
+    }
+    
+    const sentenceIndex = availableSentences.length > 0 
+      ? availableSentences[Math.floor(Math.random() * availableSentences.length)]
+      : Math.floor(Math.random() * sentences.length);
+    
+    const sentence = sentences[sentenceIndex].trim();
+    const wordsInSentence = sentence.split(/\s+/);
+    
+    // Find meaningful key words (nouns, verbs) that are important
+    const candidateWords = wordsInSentence.filter(word => {
+      const clean = word.toLowerCase().replace(/[^a-z]/gi, '');
+      return !isUnimportantWord(clean) && 
+             clean.length >= 3 && 
+             !usedKeyWords.has(clean) &&
+             uniqueWords.includes(clean);
+    });
+
+    if (candidateWords.length === 0) {
+      usedSentences.add(sentenceIndex);
+      continue;
+    }
+    
+    // Try to pick an unused word from the candidates
+    let keyWord = null;
+    let cleanKeyWord = '';
+    
+    for (const word of candidateWords) {
+      const clean = word.replace(/[^a-zA-Z]/g, '');
+      if (!usedKeyWords.has(clean.toLowerCase())) {
+        keyWord = word;
+        cleanKeyWord = clean;
+        break;
+      }
+    }
+    
+    // If all words in this sentence have been used, mark sentence as used and continue
+    if (!keyWord) {
+      usedSentences.add(sentenceIndex);
+      continue;
+    }
+
+    // Create contextually relevant wrong options from the same text
+    let wrongOptions = uniqueWords
+      .filter(w => {
+        return w !== cleanKeyWord.toLowerCase() && 
+               w.length >= cleanKeyWord.length - 2 && // Similar length for plausibility
+               w.length <= cleanKeyWord.length + 2 &&
+               !usedKeyWords.has(w);
+      })
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3);
+
+    // If not enough similar-length words, broaden the search
+    if (wrongOptions.length < 3) {
+      const additionalOptions = uniqueWords
+        .filter(w => {
+          return w !== cleanKeyWord.toLowerCase() && 
+                 w.length >= 3 &&
+                 !usedKeyWords.has(w) &&
+                 !wrongOptions.includes(w);
+        })
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 3 - wrongOptions.length);
+      
+      wrongOptions = [...wrongOptions, ...additionalOptions];
+    }
+
+    // Still not enough? Use generic options as last resort
+    if (wrongOptions.length < 3) {
+      const genericPool = [
+        'animal', 'domestic', 'called', 'known', 'small', 'large', 
+        'common', 'popular', 'found', 'seen', 'type', 'kind',
+        'species', 'family', 'group', 'member', 'example', 'form'
+      ];
+      const genericOptions = genericPool
+        .filter(g => g !== cleanKeyWord.toLowerCase() && !wrongOptions.includes(g))
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 3 - wrongOptions.length);
+      wrongOptions = [...wrongOptions, ...genericOptions];
+    }
+
+    // If STILL not enough after all attempts, continue trying other sentences
+    if (wrongOptions.length < 3) {
+      continue;
+    }
+
+    // Create the question with better formatting
+    const regex = new RegExp(`\\b${keyWord}\\b`, 'i');
+    const questionText = sentence.replace(regex, '________');
+    
+    // Make sure the blank was created
+    if (!questionText.includes('________')) {
+      continue;
+    }
+    
+    const options = [cleanKeyWord, ...wrongOptions];
+    
+    // Shuffle options
+    for (let i = options.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [options[i], options[j]] = [options[j], options[i]];
+    }
+
+    // Find the index of the correct answer after shuffling
+    const correctAnswerIndex = options.findIndex(opt => 
+      opt.toLowerCase() === cleanKeyWord.toLowerCase()
+    );
+
+    if (correctAnswerIndex === -1) {
+      continue;
+    }
+
+    // Generate a more natural question format
+    const questionFormats = [
+      `Which word best completes this sentence?\n"${questionText}"`,
+      `What is the missing word?\n"${questionText}"`,
+      `Complete the sentence:\n"${questionText}"`,
+      `Fill in the blank:\n"${questionText}"`
+    ];
+    
+    const questionFormat = questionFormats[questions.length % questionFormats.length];
+
+    questions.push({
+      id: questions.length + 1,
+      question: questionFormat,
+      options: options,
+      correctAnswer: correctAnswerIndex,
+      explanation: `The correct answer is "${cleanKeyWord}". In the original text, this word is used to describe or explain an important concept related to the topic.`,
+      category: category
+    });
+    
+    usedKeyWords.add(cleanKeyWord.toLowerCase());
+    usedSentences.add(sentenceIndex);
+  }
+
+  // If we still don't have enough questions, generate simpler ones from any remaining sentences
+  if (questions.length < questionCount && sentences.length > 0) {
+    console.log(`⚠️ Only generated ${questions.length} questions, attempting to create ${questionCount - questions.length} more...`);
+    
+    for (let i = 0; i < sentences.length && questions.length < questionCount; i++) {
+      const sentence = sentences[i].trim();
+      const words = sentence.split(/\s+/);
+      
+      // Find ANY word we haven't used yet (be very lenient)
+      for (const word of words) {
+        if (questions.length >= questionCount) break;
+        
+        const clean = word.toLowerCase().replace(/[^a-z]/gi, '');
+        if (clean.length >= 3 && !isUnimportantWord(clean) && !usedKeyWords.has(clean)) {
+          
+          // Get any 3 other words from the text
+          const otherWords = uniqueWords
+            .filter(w => w !== clean && w.length >= 3)
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 3);
+          
+          if (otherWords.length >= 3) {
+            const regex = new RegExp(`\\b${word}\\b`, 'i');
+            const questionText = sentence.replace(regex, '________');
+            
+            if (questionText.includes('________')) {
+              const options = [clean, ...otherWords];
+              
+              for (let i = options.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [options[i], options[j]] = [options[j], options[i]];
+              }
+              
+              const correctAnswerIndex = options.findIndex(opt => opt.toLowerCase() === clean);
+              
+              if (correctAnswerIndex !== -1) {
+                questions.push({
+                  id: questions.length + 1,
+                  question: `Fill in the blank:\n"${questionText}"`,
+                  options: options,
+                  correctAnswer: correctAnswerIndex,
+                  explanation: `The correct answer is "${clean}". This word appears in the original text.`,
+                  category: category
+                });
+                
+                usedKeyWords.add(clean);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  if (questions.length === 0) {
+    throw new Error("Could not generate meaningful questions from the provided text. Please provide a longer, more detailed text with clear sentences.");
+  }
+
+  console.log(`✅ Successfully generated ${questions.length} questions`);
   return questions;
 }
 
 function isUnimportantWord(word: string): boolean {
-  const unimportantWords = new Set([
-    'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
-    'this', 'that', 'these', 'those', 'a', 'an', 'is', 'are', 'was', 'were',
-    'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will',
-    'would', 'could', 'should', 'may', 'might', 'can', 'must', 'shall',
-    'from', 'into', 'through', 'during', 'before', 'after', 'above', 'below',
-    'up', 'down', 'out', 'off', 'over', 'under', 'again', 'further', 'then',
-    'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any',
-    'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no',
-    'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'just',
-    'now', 'helpful'
+  const stopWords = new Set([
+    "the", "be", "to", "of", "and", "a", "in", "that", "have",
+    "i", "it", "for", "not", "on", "with", "he", "as", "you",
+    "do", "at", "this", "but", "his", "by", "from", "they",
+    "we", "say", "her", "she", "or", "an", "will", "my", "one",
+    "all", "would", "there", "their", "what", "so", "up", "out",
+    "if", "about", "who", "get", "which", "go", "me"
   ]);
-  return unimportantWords.has(word.toLowerCase());
-}
-
-// AI-powered quiz generation using AWS Bedrock
-async function generateAIQuiz(text: string, questionCount: number, difficulty: string) {
-  console.log("🤖 Attempting AWS Bedrock AI generation for quiz...");
-  console.log("🔍 Environment check:");
-  if (process.env.ECS_CONTAINER_METADATA_URI || process.env.ECS_CONTAINER_METADATA_URI_V4) {
-    console.log("🏢 Running in ECS - using Task Role for credentials");
-  } else {
-    console.log("🏠 Running locally - using environment variables for credentials");
-    console.log("AWS_REGION:", process.env.AWS_REGION);
-    console.log("AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID ? "✅ Set" : "❌ Not set");
-    console.log("AWS_SECRET_ACCESS_KEY:", process.env.AWS_SECRET_ACCESS_KEY ? "✅ Set" : "❌ Not set");
-  }
-  // List of models to try in order of preferenceff
-  // Using Amazon Nova Pro as primary model with fallbacks
-  const modelsToTry = [
-    'amazon.nova-pro-v1:0',
-    'amazon.nova-lite-v1:0',
-    'anthropic.claude-3-haiku-20240307-v1:0',
-    'anthropic.claude-3-sonnet-20240229-v1:0'
-  ];
-  
-  console.log("🎯 Models to try:", modelsToTry);
-  
-  try {
-    // Dynamic import to handle potential module not found errors
-    const { BedrockRuntimeClient, InvokeModelCommand } = await import('@aws-sdk/client-bedrock-runtime');
-    
-    // const client = new BedrockRuntimeClient({
-    //   region: 'us-east-1',
-    //   credentials: {
-    //     accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    //     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-    //   },
-    // });
-
-    function createBedrockClient() {
-      console.log("ECS_CONTAINER_METADATA_URI", process.env.ECS_CONTAINER_METADATA_URI);
-      console.log("ECS_CONTAINER_METADATA_URI_V4", process.env.ECS_CONTAINER_METADATA_URI_V4);
-      console.log("region", process.env.REGION);
-
-      if (process.env.ECS_CONTAINER_METADATA_URI || process.env.ECS_CONTAINER_METADATA_URI_V4) {
-        // Running in ECS → rely on Task Role automatically
-        console.log("able to check LOCAL OR ECSSSSSSSSSSSSSSSSSSSSs");
-        return new BedrockRuntimeClient({ region: "us-east-1" });
-      } else {
-        // Running locally → use env credentials
-        console.log("not able to check LOCAL OR ECSSSSSSSSSSSSSSSSSSSSs");
-        return new BedrockRuntimeClient({
-          region: "us-east-1", // or your preferred region
-          credentials: {
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "",
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "",
-          },
-        });
-      }
-    }
-
-    const client = createBedrockClient();
-
-    const prompt = `Please analyze the following text and create exactly ${questionCount} quiz questions for testing understanding at ${difficulty} level.
-
-Focus on creating questions that test:
-- Key concepts and main ideas
-- Important details and facts
-- Understanding of relationships between concepts
-- Application of knowledge
-
-For each question:
-- Create a clear, well-formatted question
-- Provide 4 multiple choice options (A, B, C, D)
-- Place the correct answer at a random position among the 4 options (not always index 0)
-- Mark the correct answer (0-3 index)
-- Provide a detailed explanation of why the answer is correct
-- Assign an appropriate category (e.g., "General", "Technical", "Conceptual")
-
-Return as JSON array:
-[
-  {
-    "id": 1,
-    "question": "Clear, well-formatted question here?",
-    "options": [
-      "Option A",
-      "Option B", 
-      "Option C",
-      "Option D"
-    ],
-    "correctAnswer": 0,
-    "explanation": "Detailed explanation of why this answer is correct and what the other options represent.",
-    "category": "General"
-  }
-]
-
-Text to analyze:
-${text}`;
-
-    // Try each model until one works
-    for (const modelId of modelsToTry) {
-      try {
-        console.log(`🔄 Trying model: ${modelId}`);
-        
-        // Different request format for Amazon Nova vs Anthropic Claudevv
-        let requestBody;
-        if (modelId.startsWith('amazon.nova')) {
-          // Amazon Nova format - content must be array of objects with text property
-          requestBody = {
-            messages: [
-              {
-                role: 'user',
-                content: [
-                  {
-                    text: prompt
-                  }
-                ]
-              }
-            ],
-            inferenceConfig: {
-              maxTokens: 3000,
-              temperature: 0.3
-            }
-          };
-        } else {
-          // Anthropic Claude format
-          requestBody = {
-            anthropic_version: 'bedrock-2023-05-31',
-            max_tokens: 3000,
-            temperature: 0.3,
-            messages: [
-              {
-                role: 'user',
-                content: prompt
-              }
-            ]
-          };
-        }
-
-        const input = {
-          modelId: modelId,
-          contentType: 'application/json',
-          accept: 'application/json',
-          body: JSON.stringify(requestBody)
-        };
-
-        const command = new InvokeModelCommand(input);
-        const response = await client.send(command);
-        
-        const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-        
-        // Different response format for Amazon Nova vs Anthropic Claude
-        let aiResponse;
-        if (modelId.startsWith('amazon.nova')) {
-          // Amazon Nova format
-          aiResponse = responseBody.output.message.content[0].text;
-        } else {
-          // Anthropic Claude format
-          aiResponse = responseBody.content[0].text;
-        }
-
-        console.log(`✅ AWS Bedrock response received from ${modelId}`);
-
-        // Parse the JSON response
-        try {
-          const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
-          if (jsonMatch) {
-            const questions = JSON.parse(jsonMatch[0]);
-            
-            // Validate and clean the response, limit to requested count tigger build
-            return questions.slice(0, questionCount).map((question: {question?: string, options?: string[], correctAnswer?: number, explanation?: string, category?: string}, index: number) => ({
-              id: index + 1,
-              question: question.question || `Question ${index + 1}`,
-              options: question.options || ["Option A", "Option B", "Option C", "Option D"],
-              correctAnswer: question.correctAnswer || 0,
-              explanation: question.explanation || "No explanation available",
-              category: question.category || "General"
-            }));
-          } else {
-            throw new Error("No valid JSON found in AI response");
-          }
-        } catch (parseError) {
-          console.error("Failed to parse AI response:", parseError);
-          throw new Error("Failed to parse AI response");
-        }
-        
-      } catch (modelError) {
-        const errorMessage = modelError instanceof Error ? modelError.message : String(modelError);
-        console.warn(`❌ Model ${modelId} failed:`, errorMessage);
-        
-        // Provide helpful guidance based on the error
-        if (errorMessage.includes("don't have access")) {
-          console.log("💡 TIP: You don't have access to this model. Try:");
-          console.log("   1. Check your AWS Bedrock model access in the AWS Console");
-          if (modelId.includes('nova')) {
-            console.log("   2. Request access to Amazon Nova models in AWS Bedrock");
-          } else {
-            console.log("   2. Request access to Claude models in AWS Bedrock");
-          }
-          console.log("   3. Verify your AWS credentials have the necessary permissions");
-        } else if (errorMessage.includes("invalid")) {
-          console.log("💡 TIP: Model identifier is invalid. This might be a temporary issue or the model ID has changed.");
-          if (modelId.includes('nova')) {
-            console.log("   Nova Pro model ID: amazon.nova-pro-v1:0");
-            console.log("   Nova Lite model ID: amazon.nova-lite-v1:0");
-          }
-        }
-        
-        // Log detailed error information for debugging
-        if (modelError instanceof Error) {
-          console.log("Error details:", {
-            name: modelError.name,
-            message: modelError.message
-          });
-        }
-        
-        if (modelId === modelsToTry[modelsToTry.length - 1]) {
-          // If this was the last model, throw the error with helpful message
-          throw new Error(`All AI models failed. Last error: ${errorMessage}. Please check your AWS Bedrock access and permissions.`);
-        }
-        // Otherwise, continue to the next model
-        continue;
-      }
-    }
-
-  } catch (awsError) {
-    console.log("❌ AWS Bedrock error:", awsError);
-    throw new Error(`AWS Bedrock error: ${awsError instanceof Error ? awsError.message : 'Unknown error'}`);
-  }
+  return stopWords.has(word.toLowerCase());
 }

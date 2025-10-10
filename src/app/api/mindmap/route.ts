@@ -1,10 +1,34 @@
 import { NextResponse } from "next/server";
 import { createBedrockClient } from '@/lib/bedrock';
+import { createActivity } from '@/lib/db';
+
+// Track processed requests to prevent duplicates
+const processedRequests = new Set<string>();
 
 export async function POST(req: Request) {
+  const startTime = Date.now();
+  
   try {
     const body = await req.json();
     const text = body.text || "";
+    const userEmail = body.userEmail || 'anonymous@example.com';
+    const requestId = body.requestId || `${Date.now()}-${Math.random()}`;
+
+    // Check for duplicate requests
+    if (processedRequests.has(requestId)) {
+      console.log(`⚠️ Duplicate mindmap request detected: ${requestId}`);
+      return NextResponse.json({ 
+        error: "Duplicate request detected" 
+      }, { status: 409 });
+    }
+
+    // Mark this request as being processed
+    processedRequests.add(requestId);
+
+    // Clean up old request IDs after 5 minutes
+    setTimeout(() => {
+      processedRequests.delete(requestId);
+    }, 5 * 60 * 1000);
 
     if (!text.trim()) {
       return NextResponse.json({ error: "Text content cannot be empty" }, { status: 400 });
@@ -21,6 +45,45 @@ export async function POST(req: Request) {
       console.log("🔄 Switching to algorithm-based mind map generation...");
       mindMap = generateMindMap(text);
       console.log("✅ Fallback mind map generation complete");
+    }
+
+    // Calculate duration
+    const duration = Date.now() - startTime;
+
+    // Create a simple title from the first sentence
+    const firstSentence = text.split(/[.!?]+/)[0].trim();
+    const title = firstSentence.length > 50 ? 
+      firstSentence.substring(0, 47) + '...' : 
+      firstSentence;
+
+    // Save activity to database
+    try {
+      const activityId = await createActivity({
+        userEmail: userEmail,
+        type: 'mindmap',
+        title: title,
+        inputText: text.substring(0, 500), // Store first 500 chars
+        result: {
+          mindMap: {
+            title: mindMap.title,
+            nodeCount: mindMap.nodes?.length || 0,
+            connectionCount: mindMap.connections?.length || 0
+          }
+        },
+        status: 'completed',
+        duration: duration,
+        metadata: {
+          nodeCount: mindMap.nodes?.length || 0,
+          connectionCount: mindMap.connections?.length || 0,
+          tags: [`${mindMap.nodes?.length || 0} Nodes`, `${mindMap.connections?.length || 0} Connections`],
+          originalTitle: title
+        }
+      });
+
+      console.log(`✅ Mindmap activity saved with ID: ${activityId}`);
+    } catch (dbError) {
+      console.error('❌ Failed to save mindmap activity to database:', dbError);
+      // Don't fail the request if database save fails
     }
 
     return NextResponse.json({ result: mindMap });

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ChatBox from '../chatbox';
 
 interface SummaryResponse {
@@ -13,25 +13,46 @@ interface SummaryResponse {
 interface TextToSummaryProps {
   inputText: string;
   onBack: () => void;
+  userEmail?: string;
 }
 
-export default function TextToSummary({ inputText, onBack }: TextToSummaryProps) {
+export default function TextToSummary({ inputText, onBack, userEmail }: TextToSummaryProps) {
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  
+  // Refs to prevent duplicate generation
+  const hasGeneratedRef = useRef(false);
+  const generatingRef = useRef(false);
 
   const generateSummary = useCallback(async () => {
+    // Prevent duplicate generation
+    if (generatingRef.current || hasGeneratedRef.current) {
+      console.log('[TextToSummary] Summary generation already in progress or completed, skipping...');
+      return;
+    }
+    
+    generatingRef.current = true;
     setIsGenerating(true);
     setError(null);
 
     try {
+      // Generate unique request ID
+      const requestId = `summary-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      
+      console.log(`[TextToSummary] Starting summary generation with requestId: ${requestId}`);
+      
       const response = await fetch('/api/summarize', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ text: inputText }),
+        body: JSON.stringify({ 
+          text: inputText,
+          userEmail: userEmail || 'anonymous@example.com',
+          requestId: requestId
+        }),
       });
 
       if (!response.ok) {
@@ -40,18 +61,24 @@ export default function TextToSummary({ inputText, onBack }: TextToSummaryProps)
 
       const data = await response.json();
       setSummary(data.result);
+      console.log('[TextToSummary] Summary generation successful');
+      
+      hasGeneratedRef.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('[TextToSummary] Error generating summary:', err);
     } finally {
       setIsGenerating(false);
+      generatingRef.current = false;
     }
-  }, [inputText]);
+  }, [inputText, userEmail]);
 
   useEffect(() => {
     if (inputText.trim()) {
       generateSummary();
     }
-  }, [inputText, generateSummary]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputText]);
 
   const copyToClipboard = async (text: string, type: string = 'text') => {
     try {

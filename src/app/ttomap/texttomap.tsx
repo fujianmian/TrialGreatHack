@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 interface MindMapNode {
   id: string;
@@ -25,9 +25,10 @@ interface TextToMapProps {
   inputText?: string;
   searchParams?: Promise<{ text?: string }>;
   onBack?: () => void;
+  userEmail?: string;
 }
 
-export default function TextToMap({ inputText, searchParams, onBack }: TextToMapProps) {
+export default function TextToMap({ inputText, searchParams, onBack, userEmail }: TextToMapProps) {
   const [mindMap, setMindMap] = useState<MindMapResponse | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +37,10 @@ export default function TextToMap({ inputText, searchParams, onBack }: TextToMap
   const [panY, setPanY] = useState(0);
   // Removed dragging state - circles will stay fixed
   const [urlText, setUrlText] = useState<string>('');
+  
+  // Refs to prevent duplicate generation
+  const hasGeneratedRef = useRef(false);
+  const generatingRef = useRef(false);
 
   // Handle searchParams
   useEffect(() => {
@@ -50,16 +55,32 @@ export default function TextToMap({ inputText, searchParams, onBack }: TextToMap
   const finalInputText = inputText || urlText;
 
   const generateMindMap = useCallback(async () => {
+    // Prevent duplicate generation
+    if (generatingRef.current || hasGeneratedRef.current) {
+      console.log('[TextToMap] Mindmap generation already in progress or completed, skipping...');
+      return;
+    }
+    
+    generatingRef.current = true;
     setIsGenerating(true);
     setError(null);
 
     try {
+      // Generate unique request ID
+      const requestId = `mindmap-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      
+      console.log(`[TextToMap] Starting mindmap generation with requestId: ${requestId}`);
+      
       const response = await fetch('/api/mindmap', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ text: finalInputText }),
+        body: JSON.stringify({ 
+          text: finalInputText,
+          userEmail: userEmail || 'anonymous@example.com',
+          requestId: requestId
+        }),
       });
 
       if (!response.ok) {
@@ -70,16 +91,21 @@ export default function TextToMap({ inputText, searchParams, onBack }: TextToMap
       
       // Validate the response structure
       if (data.result && data.result.nodes && Array.isArray(data.result.nodes)) {
-      setMindMap(data.result);
+        setMindMap(data.result);
+        console.log('[TextToMap] Mindmap generation successful');
       } else {
         throw new Error('Invalid mindmap data structure received');
       }
+      
+      hasGeneratedRef.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('[TextToMap] Error generating mindmap:', err);
     } finally {
       setIsGenerating(false);
+      generatingRef.current = false;
     }
-  }, [finalInputText]);
+  }, [finalInputText, userEmail]);
 
   const getNodeColor = (level: number) => {
     const colors = [
@@ -97,7 +123,8 @@ export default function TextToMap({ inputText, searchParams, onBack }: TextToMap
     if (finalInputText && finalInputText.trim()) {
       generateMindMap();
     }
-  }, [finalInputText, generateMindMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finalInputText]);
 
   const getTextSize = (level: number) => {
     // All nodes same text size regardless of level

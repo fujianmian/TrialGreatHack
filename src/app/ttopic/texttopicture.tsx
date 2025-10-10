@@ -1,27 +1,49 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
 interface TextToPictureProps {
   inputText: string;
   onBack: () => void;
+  userEmail?: string;
 }
 
-const TextToPicture = ({ inputText, onBack }: TextToPictureProps) => {
+const TextToPicture = ({ inputText, onBack, userEmail }: TextToPictureProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
+  
+  // Refs to prevent duplicate generation
+  const hasGeneratedRef = useRef(false);
+  const generatingRef = useRef(false);
 
   const handleGenerateImage = async () => {
+    // Prevent duplicate generation
+    if (generatingRef.current || hasGeneratedRef.current) {
+      console.log('[TextToPicture] Picture generation already in progress or completed, skipping...');
+      return;
+    }
+    
+    generatingRef.current = true;
     setIsLoading(true);
     setError(null);
+    
     try {
+      // Generate unique request ID
+      const requestId = `picture-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      
+      console.log(`[TextToPicture] Starting picture generation with requestId: ${requestId}`);
+      
       const response = await fetch('/api/text-to-picture', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ text: inputText }),
+        body: JSON.stringify({ 
+          text: inputText,
+          userEmail: userEmail || 'anonymous@example.com',
+          requestId: requestId
+        }),
       });
 
       const data = await response.json();
@@ -31,17 +53,19 @@ const TextToPicture = ({ inputText, onBack }: TextToPictureProps) => {
       }
 
       setImageUrl(data.imageUrl);
+      console.log('[TextToPicture] Picture generation successful');
+      hasGeneratedRef.current = true;
     } catch (error: any) {
       setError(error.message);
-      console.error(error);
+      console.error('[TextToPicture] Error generating picture:', error);
     } finally {
       setIsLoading(false);
+      generatingRef.current = false;
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
-      <div>Hello from TextToPicture</div>
       <div className="w-full max-w-2xl">
         <button
           onClick={onBack}

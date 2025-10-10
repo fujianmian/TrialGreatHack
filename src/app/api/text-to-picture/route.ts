@@ -2,11 +2,35 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { createBedrockClient } from '@/lib/bedrock';
 import OpenAI from 'openai';
+import { createActivity } from '@/lib/db';
+
+// Track processed requests to prevent duplicates
+const processedRequests = new Set<string>();
 
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
+
   try {
     const body = await req.json();
     const { text } = body;
+    const userEmail = body.userEmail || 'anonymous@example.com';
+    const requestId = body.requestId || `${Date.now()}-${Math.random()}`;
+
+    // Check for duplicate requests
+    if (processedRequests.has(requestId)) {
+      console.log(`⚠️ Duplicate picture request detected: ${requestId}`);
+      return NextResponse.json({ 
+        error: "Duplicate request detected" 
+      }, { status: 409 });
+    }
+
+    // Mark this request as being processed
+    processedRequests.add(requestId);
+
+    // Clean up old request IDs after 5 minutes
+    setTimeout(() => {
+      processedRequests.delete(requestId);
+    }, 5 * 60 * 1000);
 
     if (!text) {
       return NextResponse.json({ error: 'Text is required' }, { status: 400 });
@@ -79,6 +103,48 @@ ${text}`;
     const responseBody = JSON.parse(new TextDecoder().decode(response.body));
     const base64ImageData = responseBody.images[0];
     const imageUrl = `data:image/png;base64,${base64ImageData}`;
+
+    // Calculate duration
+    const duration = Date.now() - startTime;
+
+    // Create a simple title from the first sentence
+    const firstSentence = text.split(/[.!?]+/)[0].trim();
+    const title = firstSentence.length > 50 ? 
+      firstSentence.substring(0, 47) + '...' : 
+      firstSentence;
+
+    // Save activity to database
+    try {
+      const activityId = await createActivity({
+        userEmail: userEmail,
+        type: 'picture',
+        title: title,
+        inputText: text.substring(0, 500), // Store first 500 chars
+        result: {
+          imageUrl: imageUrl.substring(0, 100) + '...', // Store truncated base64 for reference
+          prompt: generatedPrompt,
+          hasImage: true
+        },
+        status: 'completed',
+        duration: duration,
+        metadata: {
+          model: 'Titan Image Generator + OpenAI',
+          generatedPrompt: generatedPrompt,
+          imageSize: '512x512',
+          tags: [
+            '512x512',
+            'AI Generated',
+            'Titan Image'
+          ],
+          originalTitle: title
+        }
+      });
+
+      console.log(`✅ Picture activity saved with ID: ${activityId}`);
+    } catch (dbError) {
+      console.error('❌ Failed to save picture activity to database:', dbError);
+      // Don't fail the request if database save fails
+    }
 
     return NextResponse.json({ imageUrl });
   } catch (error: any) {

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "db:init": "ts-node -P ./scripts/tsconfig.json scripts/init-db.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock": "^3.893.0",
@@ -16,13 +17,16 @@
     "@aws-sdk/client-rekognition": "^3.906.0",
     "@aws-sdk/client-s3": "^3.893.0",
     "@aws-sdk/s3-request-presigner": "^3.893.0",
+    "@types/pg": "^8.15.5",
     "amazon-cognito-identity-js": "^6.3.15",
     "aws-amplify": "^6.15.7",
+    "dotenv": "^17.2.3",
     "next": "15.5.3",
     "openai": "^5.23.2",
     "pdf-parse": "^1.1.1",
     "pdfjs-dist": "^5.1.91",
     "pdfkit": "^0.17.2",
+    "pg": "^8.16.3",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-pdf": "^10.2.0",
@@ -31,7 +35,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^20.19.19",
     "@types/pdf-parse": "^1.1.5",
     "@types/pdfkit": "^0.17.3",
     "@types/react": "^19",
@@ -41,6 +45,7 @@
     "patch-package": "^8.0.0",
     "postinstall-postinstall": "^2.1.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import ChatBox from '../chatbox';
 
 interface Flashcard {
@@ -23,9 +23,10 @@ interface TextToCardProps {
   onBack: () => void;
   questionCount: number;
   difficulty: string;
+  userEmail: string;
 }
 
-export default function TextToCard({ inputText, onBack, questionCount, difficulty }: TextToCardProps) {
+export default function TextToCard({ inputText, onBack, questionCount, difficulty, userEmail }: TextToCardProps) {
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -33,6 +34,8 @@ export default function TextToCard({ inputText, onBack, questionCount, difficult
   const [studyMode, setStudyMode] = useState<'all' | 'incorrect'>('all');
   const [incorrectCards, setIncorrectCards] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const hasGeneratedRef = useRef(false);
+  const generatingRef = useRef(false);
 
   // Add Font Awesome to head
   useEffect(() => {
@@ -47,8 +50,18 @@ export default function TextToCard({ inputText, onBack, questionCount, difficult
   }, []);
 
   const generateFlashcards = useCallback(async () => {
+    // Prevent duplicate calls
+    if (generatingRef.current || hasGeneratedRef.current) {
+      console.log('[TextToCard] Flashcard generation already in progress or completed, skipping...');
+      return;
+    }
+    
+    generatingRef.current = true;
     setIsGenerating(true);
     setError(null);
+    
+    // Generate a unique request ID to prevent duplicates
+    const requestId = `${Date.now()}-${Math.random()}-${inputText.substring(0, 20)}`;
     
     try {
       const response = await fetch('/api/analyze', {
@@ -59,7 +72,9 @@ export default function TextToCard({ inputText, onBack, questionCount, difficult
         body: JSON.stringify({
           text: inputText,
           questionCount: questionCount,
-          difficulty: difficulty
+          difficulty: difficulty,
+          userEmail: userEmail,
+          requestId: requestId
         }),
       });
 
@@ -80,10 +95,13 @@ export default function TextToCard({ inputText, onBack, questionCount, difficult
 
       setFlashcards(generatedFlashcards);
       setIsGenerating(false);
+      hasGeneratedRef.current = true;
+      generatingRef.current = false;
     } catch (err) {
       console.error('Error generating flashcards:', err);
       setError(err instanceof Error ? err.message : 'Failed to generate flashcards');
       setIsGenerating(false);
+      generatingRef.current = false;
       
       // Fallback to mock data if AI fails
       const generateFallbackFlashcards = (count: number, difficulty: string): Flashcard[] => {
@@ -164,7 +182,8 @@ export default function TextToCard({ inputText, onBack, questionCount, difficult
     if (inputText) {
       generateFlashcards();
     }
-  }, [inputText, generateFlashcards]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputText]);
 
   const nextCard = () => {
     setIsFlipped(false);
