@@ -10,6 +10,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Please upload a valid image file.' }, { status: 400 });
     }
 
+    // Validate file type
+    const supportedTypes = ['image/jpeg', 'image/png'];
+    if (!supportedTypes.includes(file.type)) {
+      return NextResponse.json({ error: 'Unsupported file type. Please upload a JPEG or PNG image.' }, { status: 400 });
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer());
 
     const rekognitionClient = new RekognitionClient({
@@ -35,8 +41,8 @@ export async function POST(request: NextRequest) {
       .join('\n');
 
     return NextResponse.json({ extractedText });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error processing image:', error);
-    return NextResponse.json({ error: 'Failed to process the image.', details: error.message || 'An unknown error occurred.' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to process the image.' }, { status: 500 });
   }
 }
