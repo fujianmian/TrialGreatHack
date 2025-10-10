@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from "next/dynamic";
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import TextToCard from './ttocard/texttocard';
@@ -8,7 +9,7 @@ import TextToMap from './ttomap/texttomap';
 import TextToVideo from './ttovideo/texttovideo';
 import TextToQuiz from './texttoquiz/texttoquiz';
 import TextToPicture from './ttopic/texttopicture';
-import ExamPaper from './components/examPaper';
+const ExamPaper = dynamic(() => import('./components/examPaper'), { ssr: false });
 import ChatBox from './chatbox';
 
 interface InputMethod {

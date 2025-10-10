@@ -1,10 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
+import dynamic from 'next/dynamic';
 
-// Set up PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Dynamically import react-pdf only on client side
+
+// Explicitly tell TS what props the component accepts 👇
+const PDFViewer = dynamic<{ pdfUrl: string }>(
+  () => import('./PDFViewer'),
+  { ssr: false }
+);
+
 
 interface ExamPaperProps {
   inputText: string;
@@ -300,24 +306,8 @@ export default function ExamPaper({ inputText, onBack, difficulty }: ExamPaperPr
 
                 <div className="p-4 bg-gray-100">
                   <div className="bg-white rounded-lg shadow-inner overflow-auto max-h-[calc(100vh-300px)]">
-                    {pdfUrl && (
-                      <Document
-                        file={pdfUrl}
-                        onLoadSuccess={onDocumentLoadSuccess}
-                        loading={
-                          <div className="flex items-center justify-center p-12">
-                            <i className="fas fa-spinner fa-spin text-4xl text-[#5E2E8F]"></i>
-                          </div>
-                        }
-                      >
-                        <Page
-                          pageNumber={pageNumber}
-                          renderTextLayer={true}
-                          renderAnnotationLayer={true}
-                          className="mx-auto"
-                        />
-                      </Document>
-                    )}
+                    {pdfUrl && <PDFViewer pdfUrl={pdfUrl} />}
+
                   </div>
 
                   {/* Pagination */}
