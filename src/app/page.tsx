@@ -7,6 +7,7 @@ import TextToMap from './ttomap/texttomap';
 import TextToVideo from './ttovideo/texttovideo';
 import TextToQuiz from './texttoquiz/texttoquiz';
 import TextToPicture from './ttopic/texttopicture';
+import ExamPaper from './components/examPaper';
 import ChatBox from './chatbox';
 
 interface InputMethod {
@@ -41,6 +42,7 @@ const outputOptions: OutputOption[] = [
   { id: 'mindmap', name: 'Mind Map', icon: 'fas fa-brain' },
   { id: 'quiz', name: 'Quiz', icon: 'fas fa-question-circle' },
   { id: 'summary', name: 'Summary', icon: 'fas fa-chart-bar' },
+  { id: 'exam', name: 'Exam Paper', icon: 'fas fa-file-alt' },
 ];
 
 const features: Feature[] = [
@@ -75,8 +77,9 @@ export default function Home() {
   const [showVideo, setShowVideo] = useState(false);
   const [showQuiz, setShowQuiz] = useState(false);
   const [showPicture, setShowPicture] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [fileContent, setFileContent] = useState<string>('');
+  const [showExam, setShowExam] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [fileContents, setFileContents] = useState<{name: string, content: string}[]>([]);
   const [uploadDescription, setUploadDescription] = useState('');
   const [difficultyLevel, setDifficultyLevel] = useState<string>('Beginner');
   const [recommendation, setRecommendation] = useState<string | null>(null);
@@ -121,10 +124,11 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (selectedInputMethod === 'upload' && uploadedFile) {
-      setInputText(`File Content:\n${fileContent}\n\nDescription:\n${uploadDescription}`);
+    if (selectedInputMethod === 'upload' && uploadedFiles.length > 0) {
+      const allContent = fileContents.map(fc => fc.content).join('\n\n---\n\n');
+      setInputText(`File Content:\n${allContent}\n\nDescription:\n${uploadDescription}`);
     }
-  }, [fileContent, uploadDescription, selectedInputMethod, uploadedFile]);
+  }, [fileContents, uploadDescription, selectedInputMethod, uploadedFiles]);
 
   const handleHistory = () => {
     // Navigate to history page or show history modal
@@ -170,7 +174,7 @@ export default function Home() {
 
   const handleLogout = async () => {
     try {
-      setLoading(true); // Add this line
+      setLoading(true);
       
       // Clear all session data
       sessionStorage.removeItem('cognitoSession');
@@ -179,19 +183,19 @@ export default function Home() {
       localStorage.removeItem('userData');
       
       // Add 1 second delay
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Add this line
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       setIsAuthenticated(false);
       setUser(null);
       setShowUserMenu(false);
       
-      setLoading(false); // Add this line
+      setLoading(false);
       
       // Optional: redirect to home or login
       // window.location.href = '/';
     } catch (error) {
       console.error('Logout error:', error);
-      setLoading(false); // Add this line
+      setLoading(false);
     }
   };
 
@@ -220,6 +224,7 @@ export default function Home() {
     setShowVideo(false);
     setShowQuiz(false);
     setShowPicture(false);
+    setShowExam(false);
 
     if (selectedOutputOption === 'flashcards') {
       setShowFlashcards(true);
@@ -246,6 +251,11 @@ export default function Home() {
       setShowPicture(true);
       return;
     }
+
+    if (selectedOutputOption === 'exam') {
+      setShowExam(true);
+      return;
+    }
   };
 
   const handleBackFromFlashcards = () => setShowFlashcards(false);
@@ -254,19 +264,22 @@ export default function Home() {
   const handleBackFromVideo = () => setShowVideo(false);
   const handleBackFromQuiz = () => setShowQuiz(false);
   const handleBackFromPicture = () => setShowPicture(false);
+  const handleBackFromExam = () => setShowExam(false);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setUploadedFile(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const content = e.target?.result as string;
-        setFileContent(content);
-        setInputText(content);
-      };
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
+    const newFiles = Array.from(files);
+    setUploadedFiles(prev => [...prev, ...newFiles]);
+
+    for (const file of newFiles) {
       if (file.type === 'text/plain' || file.type === 'text/csv') {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const content = e.target?.result as string;
+          setFileContents(prev => [...prev, { name: file.name, content }]);
+        };
         reader.readAsText(file);
       } else if (file.type === 'application/pdf') {
         const formData = new FormData();
@@ -278,12 +291,10 @@ export default function Home() {
           });
           if (!response.ok) throw new Error('Failed to extract PDF text');
           const data = await response.json();
-          setFileContent(data.extractedText);
-          setInputText(data.processedContent);
+          setFileContents(prev => [...prev, { name: file.name, content: data.extractedText }]);
         } catch (err) {
           console.error('Error extracting PDF:', err);
-          setFileContent('Failed to extract PDF text.');
-          setInputText('');
+          setFileContents(prev => [...prev, { name: file.name, content: 'Failed to extract PDF text.' }]);
         }
       } else if (file.type.startsWith('image/')) {
         const formData = new FormData();
@@ -295,20 +306,26 @@ export default function Home() {
           });
           if (!response.ok) throw new Error('Failed to extract image text');
           const data = await response.json();
-          setFileContent(data.extractedText);
-          setInputText(data.extractedText);
+          setFileContents(prev => [...prev, { name: file.name, content: data.extractedText }]);
         } catch (err) {
           console.error('Error extracting image text:', err);
-          setFileContent('Failed to extract image text.');
-          setInputText('');
+          setFileContents(prev => [...prev, { name: file.name, content: 'Failed to extract image text.' }]);
         }
       }
     }
+    
+    // Reset the input value to allow uploading the same file again
+    event.target.value = '';
   };
 
-  const handleRemoveFile = () => {
-    setUploadedFile(null);
-    setFileContent('');
+  const handleRemoveFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+    setFileContents(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleRemoveAllFiles = () => {
+    setUploadedFiles([]);
+    setFileContents([]);
     setInputText('');
     setUploadDescription('');
   };
@@ -316,8 +333,8 @@ export default function Home() {
   const handleInputMethodChange = (methodId: string) => {
     setSelectedInputMethod(methodId);
     if (methodId !== 'upload') {
-      setUploadedFile(null);
-      setFileContent('');
+      setUploadedFiles([]);
+      setFileContents([]);
       setUploadDescription('');
     }
     if (methodId !== 'upload' && methodId !== selectedInputMethod) {
@@ -360,6 +377,9 @@ export default function Home() {
   }
   if (showPicture) {
     return <TextToPicture inputText={inputText} onBack={handleBackFromPicture} />;
+  }
+  if (showExam) {
+    return <ExamPaper inputText={inputText} onBack={handleBackFromExam} difficulty={difficultyLevel} />;
   }
 
   return (
@@ -574,44 +594,80 @@ export default function Home() {
             <div className="mb-6">
               {selectedInputMethod === 'upload' ? (
                 <>
-                  <div className="w-full min-h-48 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center hover:border-[#5E2E8F] hover:bg-[#5E2E8F]/10 transition-all duration-300 p-4">
-                    {uploadedFile ? (
-                      <div className="text-center p-4">
-                        <div className="flex items-center justify-center mb-4">
-                          <i className="fas fa-file text-4xl text-[#5E2E8F] mr-3"></i>
-                          <div>
-                            <p className="font-semibold text-gray-800">{uploadedFile.name}</p>
-                            <p className="text-sm text-gray-700">
-                              {(uploadedFile.size / 1024).toFixed(1)} KB
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={handleRemoveFile}
-                          className="mt-4 px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
-                        >
-                          <i className="fas fa-trash mr-2"></i>
-                          Remove File
-                        </button>
-                      </div>
-                    ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    {/* Left: Upload Area */}
+                    <div className="w-full min-h-48 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center hover:border-[#5E2E8F] hover:bg-[#5E2E8F]/10 transition-all duration-300 p-4">
                       <div className="text-center w-full">
                         <i className="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-3"></i>
                         <p className="text-base font-medium text-black mb-2">
-                          Upload a file to get started
+                          Upload files to get started
+                        </p>
+                        <p className="text-sm text-gray-600 mb-4">
+                          {uploadedFiles.length} file{uploadedFiles.length !== 1 ? 's' : ''} uploaded
                         </p>
                         <label className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] text-white rounded-lg hover:from-[#4A2480] hover:to-[#C41A75] transition-colors cursor-pointer text-sm">
                           <i className="fas fa-file-upload mr-2"></i>
-                          Choose File
+                          Choose Files
                           <input
                             type="file"
                             accept=".txt,.pdf,.doc,.docx,image/*"
                             onChange={handleFileUpload}
                             className="hidden"
+                            multiple
                           />
                         </label>
                       </div>
-                    )}
+                    </div>
+
+                    {/* Right: File List */}
+                    <div className="w-full min-h-48 border-2 border-gray-300 rounded-xl p-4 overflow-y-auto">
+                      {uploadedFiles.length === 0 ? (
+                        <div className="h-full flex items-center justify-center text-center">
+                          <div>
+                            <i className="fas fa-folder-open text-3xl text-gray-400 mb-2"></i>
+                            <p className="text-sm text-gray-600">No files uploaded yet</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200">
+                            <p className="text-sm font-semibold text-gray-700">Uploaded Files</p>
+                            <button
+                              onClick={handleRemoveAllFiles}
+                              className="text-xs text-red-600 hover:text-red-700 font-medium"
+                            >
+                              <i className="fas fa-trash mr-1"></i>
+                              Clear All
+                            </button>
+                          </div>
+                          {uploadedFiles.map((file, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                            >
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <i className="fas fa-file text-[#5E2E8F] text-lg flex-shrink-0"></i>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium text-gray-800 text-sm truncate" title={file.name}>
+                                    {file.name}
+                                  </p>
+                                  <p className="text-xs text-gray-600">
+                                    {(file.size / 1024).toFixed(1)} KB
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleRemoveFile(index)}
+                                className="ml-2 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+                                title="Remove file"
+                              >
+                                <i className="fas fa-times"></i>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="mt-4">
                     <textarea

@@ -21,14 +21,19 @@
     "next": "15.5.3",
     "openai": "^5.23.2",
     "pdf-parse": "^1.1.1",
+    "pdfjs-dist": "^5.1.91",
+    "pdfkit": "^0.17.2",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "react-pdf": "^10.2.0",
+    "react-pdf-viewer": "^0.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/pdf-parse": "^1.1.5",
+    "@types/pdfkit": "^0.17.3",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

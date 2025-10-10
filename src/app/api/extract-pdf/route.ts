@@ -9,12 +9,10 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File;
 
-    // Validate file
     if (!file || file.type !== 'application/pdf') {
       return NextResponse.json({ error: 'Please upload a valid PDF file.' }, { status: 400 });
     }
 
-    // Validate file size (e.g., 10MB limit)
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
       return NextResponse.json(
@@ -23,21 +21,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Read file buffer
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // Extract text from PDF
-    const pdfData = await pdfParse(buffer);
-    const extractedText = pdfData.text;
-
-    if (!extractedText.trim()) {
-      return NextResponse.json({ error: 'No text could be extracted from the PDF.' }, { status: 400 });
+    let pdfData;
+    try {
+      pdfData = await pdfParse(buffer, { max: 1 }); // Limit to 1 page for testing
+      if (!pdfData.text.trim()) {
+        return NextResponse.json({ error: 'No text extracted from PDF.' }, { status: 400 });
+      }
+    } catch (parseError: any) {
+      console.error('PDF parsing error:', parseError.message);
+      return NextResponse.json({ error: `Invalid PDF: ${parseError.message}` }, { status: 400 });
     }
 
-    // Prepare prompt for Amazon Nova Pro
-    const prompt = `Extract and structure the main content from this PDF document. Focus on key sections, headings, and important text. If it's a report or article, summarize the core information while preserving details. Document text:\n\n${extractedText}`;
+    const prompt = `Extract and structure the main content from this PDF document. Focus on key sections, headings, and important text. Document text:\n\n${pdfData.text}`;
     const input = {
-      modelId: 'amazon.nova-pro-v1:0', // Verify this model ID in AWS Bedrock
+      modelId: 'amazon.nova-pro-v1:0',
       messages: [{ role: 'user' as const, content: [{ text: prompt }] }],
       inferenceConfig: { maxTokens: 2000, temperature: 0.5, topP: 0.9 },
     };
@@ -47,11 +46,11 @@ export async function POST(request: NextRequest) {
     const generatedContent = response.output?.message?.content?.[0]?.text || 'No content generated.';
 
     return NextResponse.json({
-      extractedText, // Raw text from pdf-parse
-      processedContent: generatedContent, // Structured content from Nova Pro
+      extractedText: pdfData.text,
+      processedContent: generatedContent,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error processing PDF:', error);
-    return NextResponse.json({ error: 'Failed to process the PDF.' }, { status: 500 });
+    return NextResponse.json({ error: `Failed to process PDF: ${error.message}` }, { status: 500 });
   }
 }
