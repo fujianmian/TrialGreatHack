@@ -1,0 +1,20 @@
+const fs = require('fs');
+const path = require('path');
+
+const publicDir = path.join(__dirname, '..', 'public');
+const workerSrc = path.join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'build', 'pdf.worker.min.mjs');
+const workerDest = path.join(publicDir, 'pdf.worker.min.mjs');
+
+// Create public directory if it doesn't exist
+if (!fs.existsSync(publicDir)) {
+  fs.mkdirSync(publicDir, { recursive: true });
+}
+
+// Copy worker file
+try {
+  fs.copyFileSync(workerSrc, workerDest);
+  console.log('✓ PDF worker copied successfully');
+} catch (error) {
+  console.error('Failed to copy PDF worker:', error);
+  process.exit(1);
+}

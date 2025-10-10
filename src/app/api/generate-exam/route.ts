@@ -16,14 +16,12 @@ export async function POST(req: Request) {
       );
     }
 
-    // Extract text from both PDFs
     console.log('📄 Extracting text from exam paper PDF...');
     const examText = await extractPDFText(examPDF);
-    
+
     console.log('📚 Extracting text from learning materials PDF...');
     const materialsText = await extractPDFText(materialsPDF);
 
-    // Combine texts with clear markers
     const combinedText = `
 === EXAM PAPER FORMAT (Use this as format reference) ===
 ${examText}
@@ -35,8 +33,28 @@ ${materialsText}
     console.log('🤖 Generating exam paper with AI...');
     const examContent = await generateExamWithAI(combinedText, difficulty);
 
-    return NextResponse.json({ examContent });
+    const pdfFormData = new FormData();
+    pdfFormData.append('content', examContent);
 
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const pdfResponse = await fetch(`${baseUrl}/api/generate-pdf`, {
+      method: 'POST',
+      body: pdfFormData,
+    });
+
+    if (!pdfResponse.ok) {
+      throw new Error('Failed to generate PDF');
+    }
+
+    const pdfData = await pdfResponse.arrayBuffer();
+
+    return new NextResponse(pdfData, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'inline; filename="exam-paper.pdf"',
+      },
+    });
   } catch (error) {
     console.error('Error generating exam:', error);
     return NextResponse.json(
@@ -49,17 +67,12 @@ ${materialsText}
 async function extractPDFText(file: File): Promise<string> {
   const formData = new FormData();
   formData.append('file', file);
-
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
   const response = await fetch(`${baseUrl}/api/extract-pdf`, {
     method: 'POST',
     body: formData,
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to extract PDF text');
-  }
-
+  if (!response.ok) throw new Error('Failed to extract PDF text');
   const data = await response.json();
   return data.extractedText || '';
 }
@@ -82,33 +95,51 @@ Your task:
   * Has appropriate point allocations
   * Includes clear instructions
 
-CRITICAL: Return the exam paper in a structured format that can be converted to PDF. Use clear section headers, question numbering, and formatting.
+CRITICAL FORMATTING RULES:
+1. DO NOT use markdown symbols like **, __, or ##
+2. Use plain text only
+3. Section headers should be in ALL CAPS or start with "Section"
+4. Marks should be placed immediately after the question text, not after answer options
+5. For multiple choice questions:
+   - Question text followed by marks [X marks]
+   - Then list options A), B), C), D) on separate lines
+   - Options should NOT be bold or have any special formatting
 
 Format your response EXACTLY like this:
 ---EXAM_START---
-[EXAM TITLE]
+[EXAM TITLE IN CAPS]
 [Course/Subject information]
-[Time allowed, instructions, etc.]
+Time allowed: [X] minutes
+Total Marks: [X]
 
-Section A: [Section Name]
-Instructions: [Any specific instructions]
+SECTION A: MULTIPLE CHOICE QUESTIONS
+Instructions: Choose the correct answer from the options provided.
 
-1. [Question text]
-   a) [Sub-question if applicable]
-   b) [Sub-question if applicable]
-   [X marks]
+1. [Question text] [2 marks]
+A) [Option A]
+B) [Option B]
+C) [Option C]
+D) [Option D]
 
-2. [Question text]
-   [X marks]
+2. [Question text] [2 marks]
+A) [Option A]
+B) [Option B]
+C) [Option C]
+D) [Option D]
 
-[Continue with all sections...]
+SECTION B: SHORT ANSWER QUESTIONS
+Instructions: Answer the questions in the space provided.
+
+1. [Question text] [4 marks]
+
+2. [Question text] [4 marks]
 
 ---EXAM_END---
 
 Input:
 ${combinedText}
 
-Generate the complete exam paper now:`;
+Generate the complete exam paper now (remember: NO markdown symbols, plain text only):`;
 
   const input = {
     modelId: 'amazon.nova-pro-v1:0',

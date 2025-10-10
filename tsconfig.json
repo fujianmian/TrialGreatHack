@@ -29,6 +29,6 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "declarations.d.ts"
-, "test-db.js"  ],
+, "test-db.js", "scripts/copy-pdf-workerjs"  ],
   "exclude": ["node_modules"]
 }

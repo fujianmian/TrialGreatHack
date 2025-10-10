@@ -3,14 +3,15 @@
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 
-// Dynamically import react-pdf only on client side
-
-// Explicitly tell TS what props the component accepts 👇
-const PDFViewer = dynamic<{ pdfUrl: string }>(
+// Update the interface to include pageNumber and onDocumentLoadSuccess
+const PDFViewer = dynamic<{
+  pdfUrl: string;
+  pageNumber?: number;
+  onDocumentLoadSuccess?: ({ numPages }: { numPages: number }) => void;
+}>(
   () => import('./PDFViewer'),
   { ssr: false }
 );
-
 
 interface ExamPaperProps {
   inputText: string;
@@ -59,24 +60,52 @@ export default function ExamPaper({ inputText, onBack, difficulty }: ExamPaperPr
       formData.append('materialsPDF', materialsPDF);
       formData.append('difficulty', difficulty);
 
-      const response = await fetch('/api/generate-exam', {
+      // Fetch the PDF from /api/generate-exam
+      const pdfResponse = await fetch('/api/generate-exam', {
         method: 'POST',
         body: formData,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate exam');
+      if (!pdfResponse.ok) {
+        const errorText = await pdfResponse.text();
+        throw new Error(errorText || 'Failed to generate exam');
       }
 
-      const data = await response.json();
-      setGeneratedExam(data.examContent);
-      
-      // Generate PDF blob
-      const pdfBlob = await generatePDFBlob(data.examContent);
+      // Validate the response content type
+      const contentType = pdfResponse.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/pdf')) {
+        throw new Error('Invalid response: Expected a PDF');
+      }
+
+      // Handle the response as a PDF blob
+      const pdfBlob = await pdfResponse.blob();
+      console.log('PDF Blob size:', pdfBlob.size, 'type:', pdfBlob.type);
+      if (pdfBlob.size === 0 || pdfBlob.type !== 'application/pdf') {
+        throw new Error('Invalid PDF blob received');
+      }
+
+      // Revoke previous URL if it exists
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+
       const url = URL.createObjectURL(pdfBlob);
+      console.log('Generated pdfUrl:', url);
       setPdfUrl(url);
       setPageNumber(1);
+      setNumPages(0); // Reset numPages to trigger onDocumentLoadSuccess
+
+      // Fetch the exam content for refinement
+      const contentResponse = await fetch('/api/generate-exam-content', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!contentResponse.ok) {
+        const errorText = await contentResponse.text();
+        throw new Error(errorText || 'Failed to fetch exam content');
+      }
+
+      const contentData = await contentResponse.json();
+      setGeneratedExam(contentData.examContent);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate exam');
       console.error('Error generating exam:', err);
@@ -109,14 +138,22 @@ export default function ExamPaper({ inputText, onBack, difficulty }: ExamPaperPr
 
       const data = await response.json();
       setGeneratedExam(data.examContent);
-      
-      // Regenerate PDF
+
+      // Revoke previous URL if it exists
       if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+
+      // Regenerate PDF
       const pdfBlob = await generatePDFBlob(data.examContent);
+      console.log('Refined PDF Blob size:', pdfBlob.size, 'type:', pdfBlob.type);
+      if (pdfBlob.size === 0 || pdfBlob.type !== 'application/pdf') {
+        throw new Error('Invalid refined PDF blob received');
+      }
+
       const url = URL.createObjectURL(pdfBlob);
       setPdfUrl(url);
       setRefinementText('');
       setPageNumber(1);
+      setNumPages(0); // Reset numPages to trigger onDocumentLoadSuccess
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to refine exam');
       console.error('Error refining exam:', err);
@@ -126,19 +163,35 @@ export default function ExamPaper({ inputText, onBack, difficulty }: ExamPaperPr
   };
 
   const generatePDFBlob = async (content: string): Promise<Blob> => {
+    const formData = new FormData();
+    formData.append('content', content);
+
     const response = await fetch('/api/generate-pdf', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
+      body: formData,
     });
 
-    if (!response.ok) throw new Error('Failed to generate PDF');
-    return await response.blob();
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || 'Failed to generate PDF');
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/pdf')) {
+      throw new Error('Invalid response: Expected a PDF');
+    }
+
+    const pdfBlob = await response.blob();
+    if (pdfBlob.size === 0 || pdfBlob.type !== 'application/pdf') {
+      throw new Error('Invalid PDF blob received from /api/generate-pdf');
+    }
+
+    return pdfBlob;
   };
 
   const handleDownload = () => {
     if (!pdfUrl) return;
-    
+
     const link = document.createElement('a');
     link.href = pdfUrl;
     link.download = `exam-paper-${Date.now()}.pdf`;
@@ -148,6 +201,7 @@ export default function ExamPaper({ inputText, onBack, difficulty }: ExamPaperPr
   };
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+    console.log('onDocumentLoadSuccess called with', numPages, 'pages');
     setNumPages(numPages);
   };
 
@@ -169,10 +223,17 @@ export default function ExamPaper({ inputText, onBack, difficulty }: ExamPaperPr
           <div className="w-32"></div>
         </header>
 
-        {!generatedExam ? (
+        {!pdfUrl ? (
           /* Upload Section */
           <div className="max-w-4xl mx-auto">
-            <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl" style={{border: '2px solid transparent', background: 'linear-gradient(white, white) padding-box, linear-gradient(135deg, #5E2E8F, #D81E83) border-box'}}>
+            <div
+              className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl"
+              style={{
+                border: '2px solid transparent',
+                background:
+                  'linear-gradient(white, white) padding-box, linear-gradient(135deg, #5E2E8F, #D81E83) border-box',
+              }}
+            >
               <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
                 <i className="fas fa-file-upload text-[#5E2E8F]"></i>
                 Upload Required Files
@@ -306,8 +367,13 @@ export default function ExamPaper({ inputText, onBack, difficulty }: ExamPaperPr
 
                 <div className="p-4 bg-gray-100">
                   <div className="bg-white rounded-lg shadow-inner overflow-auto max-h-[calc(100vh-300px)]">
-                    {pdfUrl && <PDFViewer pdfUrl={pdfUrl} />}
-
+                    {pdfUrl && (
+                      <PDFViewer
+                        pdfUrl={pdfUrl}
+                        pageNumber={pageNumber}
+                        onDocumentLoadSuccess={onDocumentLoadSuccess}
+                      />
+                    )}
                   </div>
 
                   {/* Pagination */}
@@ -338,7 +404,14 @@ export default function ExamPaper({ inputText, onBack, difficulty }: ExamPaperPr
 
             {/* Refinement Panel */}
             <div className="lg:col-span-1">
-              <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-xl sticky top-6" style={{border: '2px solid transparent', background: 'linear-gradient(white, white) padding-box, linear-gradient(135deg, #5E2E8F, #D81E83) border-box'}}>
+              <div
+                className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-xl sticky top-6"
+                style={{
+                  border: '2px solid transparent',
+                  background:
+                    'linear-gradient(white, white) padding-box, linear-gradient(135deg, #5E2E8F, #D81E83) border-box',
+                }}
+              >
                 <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                   <i className="fas fa-edit text-[#D81E83]"></i>
                   Refine Exam
@@ -365,7 +438,7 @@ Examples:
 
                 <button
                   onClick={handleRefine}
-                  disabled={isRefining || !refinementText.trim()}
+                  disabled={isRefining || !refinementText.trim() || !generatedExam}
                   className="w-full px-6 py-3 rounded-full bg-gradient-to-r from-[#D81E83] to-[#5E2E8F] text-white font-semibold hover:from-[#C41A75] hover:to-[#4A2480] transition-all duration-300 hover:-translate-y-1 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                   {isRefining ? (
@@ -383,12 +456,15 @@ Examples:
 
                 <button
                   onClick={() => {
+                    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
                     setGeneratedExam(null);
                     setPdfUrl(null);
                     setExamPDF(null);
                     setMaterialsPDF(null);
                     setRefinementText('');
                     setError(null);
+                    setPageNumber(1);
+                    setNumPages(0);
                   }}
                   className="w-full mt-3 px-6 py-3 rounded-full border-2 border-gray-300 text-gray-700 font-semibold hover:border-[#5E2E8F] hover:text-[#5E2E8F] transition-all"
                 >
