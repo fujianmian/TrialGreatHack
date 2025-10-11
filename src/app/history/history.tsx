@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import ChatBox from '../chatbox';
+import { useRouter } from 'next/navigation';
 
 // Activity types for different generation features
 interface ActivityItem {
@@ -28,12 +28,12 @@ interface HistoryComponentProps {
 }
 
 export default function HistoryComponent({ userEmail, onBack }: HistoryComponentProps) {
+  const router = useRouter();
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Font Awesome is now loaded globally in layout.tsx
 
@@ -44,6 +44,7 @@ export default function HistoryComponent({ userEmail, onBack }: HistoryComponent
   const fetchUserHistory = async () => {
     try {
       setIsLoading(true);
+      console.log('Fetching history for user:', userEmail);
       const response = await fetch(`/api/history?email=${encodeURIComponent(userEmail)}`, {
         method: 'GET',
         headers: {
@@ -56,10 +57,10 @@ export default function HistoryComponent({ userEmail, onBack }: HistoryComponent
       }
 
       const data = await response.json();
+      console.log('History data received:', { total: data.total, activities: data.activities.length });
       setActivities(data.activities || []);
     } catch (err) {
       console.error('History fetch error:', err);
-      // Don't show error to user if it's a DynamoDB permission issue - just use mock data
       console.log('Using mock data for demonstration purposes');
       
       // For demo purposes, show some mock data if API fails
@@ -332,6 +333,11 @@ export default function HistoryComponent({ userEmail, onBack }: HistoryComponent
     URL.revokeObjectURL(url);
   };
 
+  const handleActivityClick = (activity: ActivityItem) => {
+    // Navigate to content display page with activity data
+    router.push(`/view-content/${activity.id}`);
+  };
+
   const filteredActivities = activities.filter(activity => {
     const matchesFilter = selectedFilter === 'all' || activity.type === selectedFilter;
     const matchesSearch = searchQuery === '' || 
@@ -348,22 +354,6 @@ export default function HistoryComponent({ userEmail, onBack }: HistoryComponent
       acc[activity.type] = (acc[activity.type] || 0) + 1;
       return acc;
     }, {} as Record<string, number>)
-  };
-
-  const filterOptions = [
-    { value: 'all', label: 'All Activities' },
-    { value: 'summary', label: 'Summaries' },
-    { value: 'quiz', label: 'Quizzes' },
-    { value: 'flashcard', label: 'Flashcards' },
-    { value: 'mindmap', label: 'Mind Maps' },
-    { value: 'video', label: 'Videos' },
-    { value: 'picture', label: 'Pictures' },
-    { value: 'chat', label: 'Chat Sessions' }
-  ];
-
-  const getFilterLabel = (value: string) => {
-    const option = filterOptions.find(opt => opt.value === value);
-    return option ? option.label : 'All Activities';
   };
 
   return (
@@ -459,7 +449,7 @@ export default function HistoryComponent({ userEmail, onBack }: HistoryComponent
         </div>
 
         {/* Filters and Search */}
-        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 mb-8 relative z-[5000]">
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 mb-8">
           <div className="flex flex-col md:flex-row gap-4">
             {/* Search */}
             <div className="flex-1">
@@ -477,34 +467,22 @@ export default function HistoryComponent({ userEmail, onBack }: HistoryComponent
               </div>
             </div>
 
-            {/* Custom Filter Dropdown */}
-            <div className="md:w-64 relative z-50">
-              <button
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="w-full py-3 px-4 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent flex items-center justify-between relative z-50"
+            {/* Filter */}
+            <div className="md:w-64">
+              <select
+                value={selectedFilter}
+                onChange={(e) => setSelectedFilter(e.target.value)}
+                className="w-full py-3 px-4 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               >
-                <span>{getFilterLabel(selectedFilter)}</span>
-                <i className={`fas fa-chevron-down transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}></i>
-              </button>
-              
-              {isDropdownOpen && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 border border-white/20 rounded-xl overflow-hidden shadow-2xl z-[100]">
-                  {filterOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => {
-                        setSelectedFilter(option.value);
-                        setIsDropdownOpen(false);
-                      }}
-                      className={`w-full px-4 py-3 text-left text-white hover:bg-white/10 transition-colors ${
-                        selectedFilter === option.value ? 'bg-white/20' : ''
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+                <option value="all">All Activities</option>
+                <option value="summary">Summaries</option>
+                <option value="quiz">Quizzes</option>
+                <option value="flashcard">Flashcards</option>
+                <option value="mindmap">Mind Maps</option>
+                <option value="video">Videos</option>
+                <option value="picture">Pictures</option>
+                <option value="chat">Chat Sessions</option>
+              </select>
             </div>
           </div>
         </div>
@@ -544,7 +522,11 @@ export default function HistoryComponent({ userEmail, onBack }: HistoryComponent
           ) : (
             <div className="divide-y divide-white/10">
               {filteredActivities.map((activity, index) => (
-                <div key={activity.id} className="p-6 hover:bg-white/5 transition-colors">
+                <div 
+                  key={activity.id} 
+                  className="p-6 hover:bg-white/5 transition-colors cursor-pointer"
+                  onClick={() => handleActivityClick(activity)}
+                >
                   {/* Header Section */}
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -578,7 +560,10 @@ export default function HistoryComponent({ userEmail, onBack }: HistoryComponent
 
                     <div className="flex items-center gap-3">
                       <button
-                        onClick={() => downloadContent(activity)}
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent triggering the card click
+                          downloadContent(activity);
+                        }}
                         className="flex items-center justify-center w-8 h-8 bg-white/5 hover:bg-white/10 text-white rounded-full transition-all"
                         title="Download content"
                       >
@@ -601,7 +586,6 @@ export default function HistoryComponent({ userEmail, onBack }: HistoryComponent
           )}
         </div>
       </div>
-      <ChatBox />
     </div>
   );
 }

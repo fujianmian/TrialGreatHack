@@ -679,12 +679,12 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
         {videoData && videoData.videoJobs && videoData.videoJobs.length > 0 && (
           <div className="bg-white rounded-2xl shadow-2xl p-6 mt-6">
             <div className="mt-4 space-y-3">
-              {/* <div className="p-3 bg-blue-50 rounded-lg">
+              <div className="p-3 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-700">
                   <i className="fas fa-info-circle mr-2"></i>
                   These videos were generated using advanced AI analysis. Nova Pro analyzes your content to suggest specific backgrounds, visual elements, and scenes. Nova Reel then creates dynamic videos with contextual environments, relevant props, and professional cinematography - making each video unique and engaging rather than generic.
                 </p>
-              </div> */}
+              </div>
               
               <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4">
                 <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
@@ -768,7 +768,7 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
                             <p className="text-sm text-gray-600 leading-relaxed mb-3">{job.shot.prompt}</p>
                             
                             {/* Visual Details */}
-                            {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                               {job.shot.background && (
                                 <div className="bg-gray-50 rounded p-2">
                                   <span className="font-medium text-gray-700">📍 Background:</span>
@@ -799,15 +799,6 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
                                   <span className="ml-1 text-gray-600">{job.shot.lighting}</span>
                                 </div>
                               )}
-                            </div>*/}
-                            {/* Source Text */}
-                            <div className="bg-white rounded-2xl shadow-2xl p-6 mt-6">
-                              <h3 className="text-xl font-bold text-gray-800 mb-4">Source Text</h3>
-                              <div className="bg-gray-50 rounded-lg p-4 max-h-60 overflow-y-auto">
-                                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-                                  {videoData?.transcript}
-                                </p>
-                              </div>
                             </div>
                           </div>
                         </div>
@@ -821,14 +812,14 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
         )}
 
         {/* Source Text */}
-        {/* <div className="bg-white rounded-2xl shadow-2xl p-6 mt-6">
+        <div className="bg-white rounded-2xl shadow-2xl p-6 mt-6">
           <h3 className="text-xl font-bold text-gray-800 mb-4">Source Text</h3>
           <div className="bg-gray-50 rounded-lg p-4 max-h-60 overflow-y-auto">
             <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
               {videoData?.transcript}
             </p>
           </div>
-        </div> */}
+        </div>
       </div>
     </div>
   );

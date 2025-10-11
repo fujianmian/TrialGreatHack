@@ -51,6 +51,20 @@ export default function TextToMap({ inputText, searchParams, onBack, userEmail }
     }
   }, [searchParams]);
 
+  // Check for sessionStorage data from history
+  useEffect(() => {
+    const savedInput = sessionStorage.getItem('mindmapInput');
+    const shouldRegenerate = sessionStorage.getItem('regenerateMindmap');
+    
+    if (savedInput && shouldRegenerate === 'true') {
+      console.log('[TextToMap] Loading from history:', savedInput);
+      setUrlText(savedInput);
+      // Clear the flags
+      sessionStorage.removeItem('mindmapInput');
+      sessionStorage.removeItem('regenerateMindmap');
+    }
+  }, []);
+
   // Determine the final input text
   const finalInputText = inputText || urlText;
 
