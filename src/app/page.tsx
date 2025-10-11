@@ -70,6 +70,8 @@ export default function Home() {
   const [selectedInputMethod, setSelectedInputMethod] = useState('text');
   const [selectedOutputOption, setSelectedOutputOption] = useState<string>('');
   const [inputText, setInputText] = useState('A cute cat playing with a ball of yarn.');
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null); // Using 'any' for SpeechRecognition to handle vendor prefixes
   const [isGenerating, setIsGenerating] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isRecommending, setIsRecommending] = useState(false);
@@ -110,6 +112,80 @@ export default function Home() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showUserMenu]);
+
+  // Initialize Speech Recognition
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      const recognition = recognitionRef.current;
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event: any) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        setInputText(transcript);
+      };
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+    } else {
+      console.error('Speech recognition not supported in this browser.');
+    }
+  }, []);
+
+  // Initialize Speech Recognition
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      const recognition = recognitionRef.current;
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event: any) => {
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+        }
+        if (finalTranscript) {
+          setInputText(prev => prev + finalTranscript);
+        }
+      };
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+    } else {
+      console.error('Speech recognition not supported in this browser.');
+    }
+  }, []);
 
   // Check authentication status
   useEffect(() => {
@@ -319,6 +395,19 @@ export default function Home() {
     setFileContents([]);
     setInputText('');
     setUploadDescription('');
+  };
+
+  const handleVoiceInput = () => {
+    if (!recognitionRef.current) {
+      console.error("Speech recognition is not initialized.");
+      return;
+    }
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      setInputText(''); // Clear previous text before starting new recognition
+      recognitionRef.current.start();
+    }
   };
 
   const handleInputMethodChange = (methodId: string) => {
@@ -668,6 +757,31 @@ export default function Home() {
                       placeholder="Add a description or instructions for the AI..."
                     />
                   </div>
+                </>
+              ) : selectedInputMethod === 'voice' ? (
+                <>
+                  <div className="w-full p-4 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-center mb-4">
+                    <button
+                      onClick={handleVoiceInput}
+                      className={`w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 ${
+                        isListening
+                          ? 'bg-red-500 hover:bg-red-600 animate-pulse'
+                          : 'bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] hover:from-[#4A2480] hover:to-[#C41A75]'
+                      }`}
+                    >
+                      <i className={`fas ${isListening ? 'fa-stop' : 'fa-microphone'} text-white text-4xl`}></i>
+                    </button>
+                    <p className="text-black mt-4 font-medium">
+                      {isListening ? 'Listening... Click to stop' : 'Click to start speaking'}
+                    </p>
+                  </div>
+                  <textarea
+                    value={inputText}
+                    readOnly={isListening}
+                    onChange={(e) => setInputText(e.target.value)}
+                    className="w-full h-24 p-4 border-2 border-gray-200 rounded-xl resize-y text-base text-black focus:outline-none focus:border-[#5E2E8F] focus:ring-4 focus:ring-[#5E2E8F]/20 transition-all duration-300"
+                    placeholder={isListening ? "Your transcribed text will appear here..." : "Transcribed text can be edited here."}
+                  />
                 </>
               ) : (
                 <textarea
