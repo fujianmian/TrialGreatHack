@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
+import ChatBox from '../chatbox';
 
 // Update the interface to include pageNumber and onDocumentLoadSuccess
 const PDFViewer = dynamic<{
@@ -476,6 +477,7 @@ Examples:
           </div>
         )}
       </div>
+      <ChatBox />
     </div>
   );
 }
