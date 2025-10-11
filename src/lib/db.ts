@@ -25,7 +25,7 @@ export async function query(text: string, params?: any[]) {
   }
 }
 
-// ✅ Database schema initialization
+// ✅ Database schema initialization trigger
 export async function initializeDatabase() {
   try {
     await query(`
