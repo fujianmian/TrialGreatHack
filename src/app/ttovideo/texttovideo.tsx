@@ -1,3 +1,4 @@
+'use client';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 
 interface VideoJob {
@@ -90,7 +91,7 @@ const VideoPlayer = ({ video, index, onError }: VideoPlayerProps) => {
         </div>
       </div>
     );
-  }
+  };
 
   return (
     <>
@@ -125,14 +126,12 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [allVideosComplete, setAllVideosComplete] = useState(false);
   
-  // Refs to prevent infinite loops and duplicate generation
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasGeneratedRef = useRef(false);
   const generatingRef = useRef(false);
   const statusCheckCountRef = useRef(0);
   const renderCountRef = useRef(0);
 
-  // Track renders - keep logging for development
   const currentRenderCount = ++renderCountRef.current;
   
   if (currentRenderCount % 100 === 0 || currentRenderCount < 10) {
@@ -146,7 +145,6 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
   }
 
   const generateVideo = useCallback(async () => {
-    // Prevent duplicate generation
     if (generatingRef.current || hasGeneratedRef.current) {
       console.log('[TextToVideo] Video generation already in progress or completed, skipping...');
       return;
@@ -158,7 +156,6 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
     setError(null);
 
     try {
-      // Generate unique request ID
       const requestId = `video-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       
       console.log(`[TextToVideo] Starting video generation with requestId: ${requestId}`);
@@ -185,7 +182,6 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
       console.log('[TextToVideo] Video generation successful');
       setVideoData(data.result);
       
-      // Start checking status of all video jobs
       if (data.result.videoJobs && data.result.videoJobs.length > 0) {
         startStatusChecking(data.result.videoJobs);
       }
@@ -232,7 +228,6 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
   const startStatusChecking = useCallback((videoJobs: VideoJob[]) => {
     console.log('🕐 Starting status checking for', videoJobs.length, 'jobs');
     
-    // Clear any existing interval
     if (intervalRef.current) {
       console.log('🛑 Clearing existing interval');
       clearInterval(intervalRef.current);
@@ -260,7 +255,6 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
       setVideoStatuses(newStatuses);
       setIsCheckingStatus(false);
       
-      // Check if all jobs are complete (Completed or Failed)
       const incompleteJobs = Object.values(newStatuses).filter(
         status => status.status === 'InProgress'
       );
@@ -280,7 +274,6 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
         inProgress: incompleteJobs.length
       });
       
-      // Mark as all complete when no more jobs are in progress
       if (incompleteJobs.length === 0 && Object.keys(newStatuses).length > 0) {
         console.log('🎉 All jobs finished! Completed:', completedJobs.length, 'Failed:', failedJobs.length);
         setAllVideosComplete(true);
@@ -292,17 +285,14 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
       }
     };
 
-    // Check immediately
     checkAllStatuses();
     
-    // Then check every 15 seconds
     intervalRef.current = setInterval(async () => {
       if (!allVideosComplete) {
         await checkAllStatuses();
       }
     }, 15000);
     
-    // Cleanup after 10 minutes
     setTimeout(() => {
       if (intervalRef.current) {
         console.log('⏰ 10-minute timeout reached, clearing interval');
@@ -313,7 +303,6 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
     }, 600000);
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (intervalRef.current) {
@@ -330,7 +319,6 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
       const status = videoStatuses[job.invocationArn];
       const s3Url = status?.status === 'Completed' ? status.s3Url : null;
       
-      // Validate S3 URL
       const isValidUrl = s3Url && typeof s3Url === 'string' && s3Url.startsWith('http');
       
       return {
@@ -342,14 +330,12 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
     });
   }, [videoData, videoStatuses]);
 
-  // Memoize completed videos to prevent recalculation on every render
   const completedVideos = useMemo(() => getCompletedVideos(), [getCompletedVideos]);
   const availableVideos = useMemo(() => 
     completedVideos.filter(video => video.status === 'Completed' && video.s3Url),
     [completedVideos]
   );
 
-  // Show enhanced loading page until all videos are complete
   if (isGenerating || (videoData && !allVideosComplete)) {
     const completedCount = completedVideos.filter(v => v.status === 'Completed' && v.s3Url).length;
     const failedCount = completedVideos.filter(v => v.status === 'Failed' || v.error).length;
@@ -376,57 +362,7 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
                 Using AI to analyze your content and generate multiple engaging videos...
               </p>
               <div className="space-y-2 text-sm text-gray-500">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <span className="font-medium text-gray-700">Key Themes:</span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {videoData.content_analysis.key_themes?.map((theme, idx) => (
-                        <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
-                          {theme}
-                        </span>
-                      )) || []}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Visual Metaphors:</span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {videoData.content_analysis.visual_metaphors?.map((metaphor, idx) => (
-                        <span key={idx} className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">
-                          {metaphor}
-                        </span>
-                      )) || []}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Target Audience:</span>
-                    <span className="ml-2 text-gray-600">{videoData.content_analysis.target_audience || 'Not specified'}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Emotional Tone:</span>
-                    <span className="ml-2 text-gray-600">{videoData.content_analysis.emotional_tone || 'Not specified'}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Source Text */}
-            <div className="mb-6 bg-gray-50 rounded-lg p-4">
-              <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <i className="fas fa-file-alt text-gray-600"></i>
-                Source Text
-              </h4>
-              <div className="bg-white rounded-lg p-4 max-h-60 overflow-y-auto border border-gray-200">
-                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-                  {videoData?.transcript}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}="flex items-center justify-center gap-2">
+                <div className="flex items-center justify-center gap-2">
                   <i className="fas fa-brain text-purple-500"></i>
                   <span>Analyzing content with Nova Pro</span>
                 </div>
@@ -446,7 +382,6 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
                 Waiting for all 3 videos to complete generation...
               </p>
               
-              {/* Progress Bar */}
               <div className="mb-6">
                 <div className="flex justify-between text-sm text-gray-600 mb-2">
                   <span>Progress</span>
@@ -460,7 +395,6 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
                 </div>
               </div>
               
-              {/* Status Grid */}
               <div className="grid grid-cols-3 gap-4 mb-6">
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                   <div className="text-2xl font-bold text-green-600">{completedCount}</div>
@@ -476,7 +410,6 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
                 </div>
               </div>
               
-              {/* Video List */}
               <div className="text-left max-h-40 overflow-y-auto bg-gray-50 rounded-lg p-3 mb-4">
                 <h4 className="font-semibold text-gray-700 mb-2">Video Status:</h4>
                 <div className="space-y-1 text-sm">
@@ -611,13 +544,11 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
     );
   }
 
-  // Get the first available video for single player display
   const primaryVideo = availableVideos.length > 0 ? availableVideos[0] : null;
 
   return (
     <div className="min-h-screen bg-gray-900 p-4">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="bg-white rounded-3xl px-8 shadow-lg border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-3xl font-bold text-gray-800">AI Generated Video</h1>
@@ -635,7 +566,6 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
           </div>
         </div>
 
-        {/* Three Video Players */}
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {[0, 1, 2].map((index) => {
@@ -651,9 +581,7 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
                       <VideoPlayer 
                         video={video} 
                         index={index}
-                        onError={() => {
-                          // This will be handled by the VideoPlayer component
-                        }}
+                        onError={() => {}}
                       />
                     ) : (
                       <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-8">
@@ -725,7 +653,6 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
           </div>
         </div>
 
-        {/* Enhanced Video Breakdown */}
         {videoData && videoData.videoJobs && videoData.videoJobs.length > 0 && (
           <div className="bg-white rounded-2xl shadow-2xl p-6 mt-6">
             <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
@@ -733,11 +660,59 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
               Enhanced Video Breakdown
             </h3>
             
-            {/* Content Analysis */}
             {videoData?.content_analysis && (
               <div className="mb-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4">
                 <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
                   <i className="fas fa-brain text-blue-500"></i>
                   AI Content Analysis
                 </h4>
-                <div className
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-700">Key Themes:</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {videoData.content_analysis.key_themes?.map((theme, idx) => (
+                        <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                          {theme}
+                        </span>
+                      )) || []}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Visual Metaphors:</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {videoData.content_analysis.visual_metaphors?.map((metaphor, idx) => (
+                        <span key={idx} className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">
+                          {metaphor}
+                        </span>
+                      )) || []}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Target Audience:</span>
+                    <span className="ml-2 text-gray-600">{videoData.content_analysis.target_audience || 'Not specified'}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Emotional Tone:</span>
+                    <span className="ml-2 text-gray-600">{videoData.content_analysis.emotional_tone || 'Not specified'}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <i className="fas fa-file-alt text-gray-600"></i>
+                Source Text
+              </h4>
+              <div className="bg-white rounded-lg p-4 max-h-60 overflow-y-auto border border-gray-200">
+                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                  {videoData?.transcript}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
