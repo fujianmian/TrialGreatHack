@@ -971,7 +971,7 @@ export default function Home() {
                 <a href="#" className="text-gray-400 hover:text-[#5E2E8F] transition-colors">
                   <i className="fab fa-linkedin text-xl"></i>
                 </a>
-                <a href="#" className="text-gray-400 hover:text-[#5E2E8F] transition-colors">
+                <a href="https://github.com/fujianmian/TrialGreatHack" className="text-gray-400 hover:text-[#5E2E8F] transition-colors">
                   <i className="fab fa-github text-xl"></i>
                 </a>
               </div>
