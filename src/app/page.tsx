@@ -110,6 +110,7 @@ export default function Home() {
     };
   }, [showUserMenu]);
 
+
   // Initialize Speech Recognition
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -126,45 +127,6 @@ export default function Home() {
           transcript += event.results[i][0].transcript;
         }
         setInputText(transcript);
-      };
-
-      recognition.onstart = () => {
-        setIsListening(true);
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
-      recognition.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error);
-        setIsListening(false);
-      };
-    } else {
-      console.error('Speech recognition not supported in this browser.');
-    }
-  }, []);
-
-  // Initialize Speech Recognition
-  useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      recognitionRef.current = new SpeechRecognition();
-      const recognition = recognitionRef.current;
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-
-      recognition.onresult = (event: any) => {
-        let finalTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-          }
-        }
-        if (finalTranscript) {
-          setInputText(prev => prev + finalTranscript);
-        }
       };
 
       recognition.onstart = () => {

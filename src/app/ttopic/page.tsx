@@ -1,13 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import TextToPicture from './texttopicture';
 import ChatBox from '../chatbox';
-
 
 export default function TextToPicturePage() {
   const [inputText, setInputText] = useState('A beautiful landscape with mountains and a lake.');
   const [showPicture, setShowPicture] = useState(false);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const text = urlParams.get('text');
+    if (text) {
+      setInputText(text);
+      setShowPicture(true);
+    }
+  }, []);
 
   const handleGenerate = () => {
     setShowPicture(true);
@@ -18,7 +26,12 @@ export default function TextToPicturePage() {
   };
 
   if (showPicture) {
-    return <TextToPicture inputText={inputText} onBack={handleBack} />;
+    return (
+      <>
+        <TextToPicture inputText={inputText} onBack={handleBack} />
+        <ChatBox />
+      </>
+    );
   }
 
   return (

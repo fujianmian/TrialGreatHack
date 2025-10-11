@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import ChatBox from '../chatbox';
-
 
 interface TextToPictureProps {
   inputText: string;
@@ -100,7 +98,6 @@ const TextToPicture = ({ inputText, onBack, userEmail }: TextToPictureProps) => 
           )}
         </div>
       </div>
-      <ChatBox />
     </div>
   );
 };
