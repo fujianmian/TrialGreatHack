@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import ChatBox from '../chatbox';
 
 // Activity types for different generation features
 interface ActivityItem {
@@ -600,6 +601,7 @@ export default function HistoryComponent({ userEmail, onBack }: HistoryComponent
           )}
         </div>
       </div>
+      <ChatBox />
     </div>
   );
 }

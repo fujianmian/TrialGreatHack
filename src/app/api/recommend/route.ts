@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     const prompt = `
       You are an educational assistant. 
       The user wants to learn about: "${userInput}".
-      Recommend the most effective format: one of [video, flashcards, mindmap, quiz, summary, image].
+      Recommend the most effective format: one of [video, flashcards, mindmap, quiz, summary, picture].
       Reply ONLY with the format id (exactly one word).
     `;
 
