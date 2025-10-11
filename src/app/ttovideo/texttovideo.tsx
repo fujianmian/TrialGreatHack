@@ -376,7 +376,57 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
                 Using AI to analyze your content and generate multiple engaging videos...
               </p>
               <div className="space-y-2 text-sm text-gray-500">
-                <div className="flex items-center justify-center gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-700">Key Themes:</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {videoData.content_analysis.key_themes?.map((theme, idx) => (
+                        <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                          {theme}
+                        </span>
+                      )) || []}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Visual Metaphors:</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {videoData.content_analysis.visual_metaphors?.map((metaphor, idx) => (
+                        <span key={idx} className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">
+                          {metaphor}
+                        </span>
+                      )) || []}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Target Audience:</span>
+                    <span className="ml-2 text-gray-600">{videoData.content_analysis.target_audience || 'Not specified'}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Emotional Tone:</span>
+                    <span className="ml-2 text-gray-600">{videoData.content_analysis.emotional_tone || 'Not specified'}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Source Text */}
+            <div className="mb-6 bg-gray-50 rounded-lg p-4">
+              <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <i className="fas fa-file-alt text-gray-600"></i>
+                Source Text
+              </h4>
+              <div className="bg-white rounded-lg p-4 max-h-60 overflow-y-auto border border-gray-200">
+                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                  {videoData?.transcript}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}="flex items-center justify-center gap-2">
                   <i className="fas fa-brain text-purple-500"></i>
                   <span>Analyzing content with Nova Pro</span>
                 </div>
@@ -678,158 +728,16 @@ export default function TextToVideo({ inputText, onBack, userEmail }: TextToVide
         {/* Enhanced Video Breakdown */}
         {videoData && videoData.videoJobs && videoData.videoJobs.length > 0 && (
           <div className="bg-white rounded-2xl shadow-2xl p-6 mt-6">
-            <div className="mt-4 space-y-3">
-              {/* <div className="p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm text-blue-700">
-                  <i className="fas fa-info-circle mr-2"></i>
-                  These videos were generated using advanced AI analysis. Nova Pro analyzes your content to suggest specific backgrounds, visual elements, and scenes. Nova Reel then creates dynamic videos with contextual environments, relevant props, and professional cinematography - making each video unique and engaging rather than generic.
-                </p>
-              </div> */}
-              
-              <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4">
+            <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+              <i className="fas fa-film text-purple-600"></i>
+              Enhanced Video Breakdown
+            </h3>
+            
+            {/* Content Analysis */}
+            {videoData?.content_analysis && (
+              <div className="mb-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4">
                 <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                  <i className="fas fa-film text-purple-600"></i>
-                  Enhanced Video Breakdown
+                  <i className="fas fa-brain text-blue-500"></i>
+                  AI Content Analysis
                 </h4>
-                
-                {/* Content Analysis */}
-                {videoData?.content_analysis && (
-                  <div className="mb-4 bg-white rounded-lg p-3 shadow-sm">
-                    <h5 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                      <i className="fas fa-brain text-blue-500"></i>
-                      AI Content Analysis
-                    </h5>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <span className="font-medium text-gray-700">Key Themes:</span>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {videoData.content_analysis.key_themes?.map((theme, idx) => (
-                            <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
-                              {theme}
-                            </span>
-                          )) || []}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-700">Visual Metaphors:</span>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {videoData.content_analysis.visual_metaphors?.map((metaphor, idx) => (
-                            <span key={idx} className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">
-                              {metaphor}
-                            </span>
-                          )) || []}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-700">Target Audience:</span>
-                        <span className="ml-2 text-gray-600">{videoData.content_analysis.target_audience || 'Not specified'}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-700">Emotional Tone:</span>
-                        <span className="ml-2 text-gray-600">{videoData.content_analysis.emotional_tone || 'Not specified'}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Video Details for each video */}
-                <div className="space-y-4">
-                  {videoData.videoJobs.map((job, index) => {
-                    const videoStatus = videoStatuses[job.invocationArn];
-                    const isCompleted = videoStatus?.status === 'Completed' && videoStatus?.s3Url;
-                    const isInProgress = videoStatus?.status === 'InProgress';
-                    const isFailed = videoStatus?.status === 'Failed' || videoStatus?.failureMessage;
-                    
-                    return (
-                      <div key={job.shotId} className="bg-white rounded-lg p-4 shadow-sm">
-                        <div className="flex items-start gap-3">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${
-                            isCompleted ? 'bg-gradient-to-r from-green-500 to-green-600' :
-                            isInProgress ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' :
-                            isFailed ? 'bg-gradient-to-r from-red-500 to-red-600' :
-                            'bg-gradient-to-r from-gray-500 to-gray-600'
-                          }`}>
-                            {index + 1}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-2">
-                              <h5 className="font-medium text-gray-800">{job.shot.description || job.title}</h5>
-                              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                isCompleted ? 'bg-green-100 text-green-700' :
-                                isInProgress ? 'bg-yellow-100 text-yellow-700' :
-                                isFailed ? 'bg-red-100 text-red-700' :
-                                'bg-gray-100 text-gray-700'
-                              }`}>
-                                {isCompleted ? '✅ Ready' :
-                                 isInProgress ? '⏳ Processing' :
-                                 isFailed ? '❌ Failed' : '⏸️ Pending'}
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-600 leading-relaxed mb-3">{job.shot.prompt}</p>
-                            
-                            {/* Visual Details */}
-                            {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                              {job.shot.background && (
-                                <div className="bg-gray-50 rounded p-2">
-                                  <span className="font-medium text-gray-700">📍 Background:</span>
-                                  <span className="ml-1 text-gray-600">{job.shot.background}</span>
-                                </div>
-                              )}
-                              {job.shot.visual_elements && job.shot.visual_elements.length > 0 && (
-                                <div className="bg-gray-50 rounded p-2">
-                                  <span className="font-medium text-gray-700">🎨 Visual Elements:</span>
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {job.shot.visual_elements.map((element, idx) => (
-                                      <span key={idx} className="bg-green-100 text-green-800 px-1 py-0.5 rounded text-xs">
-                                        {element}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                              {job.shot.camera_movement && (
-                                <div className="bg-gray-50 rounded p-2">
-                                  <span className="font-medium text-gray-700">📹 Camera:</span>
-                                  <span className="ml-1 text-gray-600">{job.shot.camera_movement}</span>
-                                </div>
-                              )}
-                              {job.shot.lighting && (
-                                <div className="bg-gray-50 rounded p-2">
-                                  <span className="font-medium text-gray-700">💡 Lighting:</span>
-                                  <span className="ml-1 text-gray-600">{job.shot.lighting}</span>
-                                </div>
-                              )}
-                            </div>*/}
-                            {/* Source Text */}
-                            <div className="bg-white rounded-2xl shadow-2xl p-6 mt-6">
-                              <h3 className="text-xl font-bold text-gray-800 mb-4">Source Text</h3>
-                              <div className="bg-gray-50 rounded-lg p-4 max-h-60 overflow-y-auto">
-                                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-                                  {videoData?.transcript}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Source Text */}
-        {/* <div className="bg-white rounded-2xl shadow-2xl p-6 mt-6">
-          <h3 className="text-xl font-bold text-gray-800 mb-4">Source Text</h3>
-          <div className="bg-gray-50 rounded-lg p-4 max-h-60 overflow-y-auto">
-            <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-              {videoData?.transcript}
-            </p>
-          </div>
-        </div> */}
-      </div>
-    </div>
-  );
-}
+                <div className

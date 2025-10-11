@@ -621,10 +621,16 @@ export default function Home() {
                 <i className="fas fa-rocket mr-3"></i>
                 Get Started for Free
               </button>
-              <button className="px-10 py-4 rounded-full border-2 border-gray-600 text-white font-semibold text-lg hover:border-[#5E2E8F] hover:text-[#5E2E8F] hover:bg-[#5E2E8F]/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
-                <i className="fas fa-play mr-3"></i>
-                Watch Demo
-              </button>
+              <a
+                href="https://youtu.be/vNGtGP9UrpM"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <button className="px-10 py-4 rounded-full border-2 border-gray-600 text-white font-semibold text-lg hover:border-[#5E2E8F] hover:text-[#5E2E8F] hover:bg-[#5E2E8F]/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+                  <i className="fas fa-play mr-3"></i>
+                  Watch Demo
+                </button>
+              </a>
             </div>
             
             {/* Educator Exam Paper CTA */}
