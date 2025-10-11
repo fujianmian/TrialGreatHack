@@ -100,54 +100,118 @@ interface QuizQuestion {
 }
 
 async function generateAIQuiz(text: string, questionCount: number, difficulty: string): Promise<QuizQuestion[]> {
-  const client = createBedrockClient();
+  try {
+    const client = createBedrockClient();
 
-  const prompt = `Generate a quiz with ${questionCount} multiple-choice questions based on the following text. 
+    const prompt = `You are an expert quiz creator. Generate ${questionCount} multiple-choice questions based on the following text.
 The difficulty level should be ${difficulty}.
 
-Text: ${text}
+CRITICAL INSTRUCTIONS:
+- Create clear, specific questions that test understanding of the content
+- Each question must have exactly 4 options
+- Only ONE option should be correct
+- Provide a brief explanation for why the correct answer is right
+- Assign an appropriate category (General, Technical, or Advanced) based on difficulty
+- Make wrong answers plausible but clearly incorrect
 
-For each question:
-1. Create a clear, concise question
-2. Provide 4 options with one correct answer
-3. Include a brief explanation for the correct answer
-4. Assign a category (General, Technical, or Advanced)
+Return ONLY valid JSON in this exact format (an array of question objects):
+[
+  {
+    "id": 1,
+    "question": "Your clear question here?",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correctAnswer": 0,
+    "explanation": "Brief explanation of why this is correct",
+    "category": "General"
+  }
+]
 
-Format the response as a JSON array with objects containing:
-{
-  "id": number,
-  "question": string,
-  "options": string[],
-  "correctAnswer": number (0-3),
-  "explanation": string,
-  "category": string
-}`;
+Text to create quiz from:
+${text}
 
-  try {
-    const command = new InvokeModelCommand({
-      modelId: "anthropic.claude-v2",
-      contentType: "application/json",
-      accept: "application/json",
+Remember: Return ONLY the JSON array, no additional text or markdown formatting.`;
+
+    // ✅ CORRECT FORMAT FOR AMAZON NOVA PRO
+    const input = {
+      modelId: 'amazon.nova-pro-v1:0',
+      contentType: 'application/json',
+      accept: 'application/json',
       body: JSON.stringify({
-        prompt: `\${prompt}\n\nHuman: Please generate the quiz questions as specified.\n\nAssistant: Here are the quiz questions in the requested JSON format:`,
-        max_tokens: 2000,
-        temperature: 0.7,
-        top_p: 0.9,
-      }),
-    });
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                text: prompt
+              }
+            ]
+          }
+        ],
+        inferenceConfig: {
+          max_new_tokens: 3000,
+          temperature: 0.7,
+          top_p: 0.9
+        }
+      })
+    };
+    
+    console.log("🧾 Final quiz request body:", JSON.stringify(JSON.parse(input.body), null, 2));
 
+    const command = new InvokeModelCommand(input);
     const response = await client.send(command);
+    
     const responseBody = new TextDecoder().decode(response.body);
+    console.log("📦 Raw response:", responseBody.substring(0, 500) + "...");
+    
     const parsedResponse = JSON.parse(responseBody);
+    console.log("🔍 Parsed response structure:", JSON.stringify(parsedResponse, null, 2).substring(0, 500) + "...");
+    
+    // Extract the text content from Amazon Nova response format
+    // Nova response structure: { output: { message: { content: [{ text: "..." }] } } }
+    let outputText = parsedResponse.output?.message?.content?.[0]?.text;
+    
+    // Fallback: sometimes it might be in a different structure
+    if (!outputText && parsedResponse.content?.[0]?.text) {
+      outputText = parsedResponse.content[0].text;
+    }
+    
+    // Another fallback: check for completion field (older models)
+    if (!outputText && parsedResponse.completion) {
+      outputText = parsedResponse.completion;
+    }
+    
+    if (!outputText) {
+      console.error("❌ Failed to extract text. Full response structure:", JSON.stringify(parsedResponse, null, 2));
+      throw new Error("Failed to extract text from AI response. Check console for response structure.");
+    }
+    
+    console.log("📝 Extracted text:", outputText.substring(0, 300) + "...");
     
     // Extract the JSON array from the response
-    const jsonMatch = parsedResponse.completion.match(/\[[\s\S]*\]/);
+    const jsonMatch = outputText.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
-      throw new Error("Failed to parse AI response");
+      console.error("❌ No JSON array found in output text:", outputText);
+      throw new Error("Failed to parse AI response - no JSON array found");
     }
 
     const questions: QuizQuestion[] = JSON.parse(jsonMatch[0]);
+    
+    // Validate the questions
+    if (!Array.isArray(questions) || questions.length === 0) {
+      throw new Error("Invalid questions format from AI");
+    }
+    
+    // Validate each question has required fields
+    for (const q of questions) {
+      if (!q.question || !q.options || q.options.length !== 4 || 
+          q.correctAnswer === undefined || !q.explanation || !q.category) {
+        throw new Error("Invalid question structure from AI");
+      }
+    }
+    
+    console.log(`✅ AI generated ${questions.length} valid quiz questions`);
     return questions;
+    
   } catch (error) {
     console.error("Error generating quiz with AI:", error);
     throw error;
