@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createActivity } from "@/lib/db";
+import { createBedrockClient } from "@/lib/bedrock";
+import { InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
 
 // Store request IDs to prevent duplicate saves
 const processedRequests = new Set<string>();
@@ -472,13 +474,8 @@ async function generateAIFlashcards(text: string, questionCount: number, difficu
     // Dynamic import to handle potential module not found errors
     const { BedrockRuntimeClient, InvokeModelCommand } = await import('@aws-sdk/client-bedrock-runtime');
     
-    const client = new BedrockRuntimeClient({
-      region: process.env.AWS_REGION || 'us-east-1',
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-      },
-    });
+    text = text.replace(/\*/g, '');
+    const client = createBedrockClient();
 
     const prompt = `Please analyze the following text and create exactly ${questionCount} flashcards for effective learning at ${difficulty} level.
 
