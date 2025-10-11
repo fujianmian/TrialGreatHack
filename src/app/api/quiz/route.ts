@@ -101,6 +101,7 @@ interface QuizQuestion {
 
 async function generateAIQuiz(text: string, questionCount: number, difficulty: string): Promise<QuizQuestion[]> {
   try {
+    text = text.replace(/\*/g, '');
     const client = createBedrockClient();
 
     const prompt = `You are an expert quiz creator. Generate ${questionCount} multiple-choice questions based on the following text.
