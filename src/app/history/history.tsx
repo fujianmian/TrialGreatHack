@@ -32,6 +32,7 @@ export default function HistoryComponent({ userEmail, onBack }: HistoryComponent
   const [error, setError] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Font Awesome is now loaded globally in layout.tsx
 
@@ -348,6 +349,22 @@ export default function HistoryComponent({ userEmail, onBack }: HistoryComponent
     }, {} as Record<string, number>)
   };
 
+  const filterOptions = [
+    { value: 'all', label: 'All Activities' },
+    { value: 'summary', label: 'Summaries' },
+    { value: 'quiz', label: 'Quizzes' },
+    { value: 'flashcard', label: 'Flashcards' },
+    { value: 'mindmap', label: 'Mind Maps' },
+    { value: 'video', label: 'Videos' },
+    { value: 'picture', label: 'Pictures' },
+    { value: 'chat', label: 'Chat Sessions' }
+  ];
+
+  const getFilterLabel = (value: string) => {
+    const option = filterOptions.find(opt => opt.value === value);
+    return option ? option.label : 'All Activities';
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-4">
       {/* Header */}
@@ -441,7 +458,7 @@ export default function HistoryComponent({ userEmail, onBack }: HistoryComponent
         </div>
 
         {/* Filters and Search */}
-        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 mb-8">
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 mb-8 relative z-[5000]">
           <div className="flex flex-col md:flex-row gap-4">
             {/* Search */}
             <div className="flex-1">
@@ -459,22 +476,34 @@ export default function HistoryComponent({ userEmail, onBack }: HistoryComponent
               </div>
             </div>
 
-            {/* Filter */}
-            <div className="md:w-64">
-              <select
-                value={selectedFilter}
-                onChange={(e) => setSelectedFilter(e.target.value)}
-                className="w-full py-3 px-4 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            {/* Custom Filter Dropdown */}
+            <div className="md:w-64 relative z-50">
+              <button
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="w-full py-3 px-4 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent flex items-center justify-between relative z-50"
               >
-                <option value="all">All Activities</option>
-                <option value="summary">Summaries</option>
-                <option value="quiz">Quizzes</option>
-                <option value="flashcard">Flashcards</option>
-                <option value="mindmap">Mind Maps</option>
-                <option value="video">Videos</option>
-                <option value="picture">Pictures</option>
-                <option value="chat">Chat Sessions</option>
-              </select>
+                <span>{getFilterLabel(selectedFilter)}</span>
+                <i className={`fas fa-chevron-down transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}></i>
+              </button>
+              
+              {isDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 border border-white/20 rounded-xl overflow-hidden shadow-2xl z-[100]">
+                  {filterOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => {
+                        setSelectedFilter(option.value);
+                        setIsDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-3 text-left text-white hover:bg-white/10 transition-colors ${
+                        selectedFilter === option.value ? 'bg-white/20' : ''
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

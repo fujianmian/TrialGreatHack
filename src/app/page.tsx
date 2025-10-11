@@ -806,7 +806,7 @@ export default function Home() {
         {/* Features Section */}
         <section id="features" className="mb-20">
           <h2 className="text-center text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] bg-clip-text text-transparent">
-            Why Choose SmartHub?
+            Why Choose StudyHub?
           </h2>
           <p className="text-center text-xl text-gray-600 mb-16 max-w-3xl mx-auto">
             Experience the future of learning with our cutting-edge AI technology
