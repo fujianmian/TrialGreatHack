@@ -38,14 +38,54 @@ jobs:
             --arg OPENAI_KEY "${{ secrets.OPENAI_API_KEY }}" \
             --arg COGNITO_CLIENT_ID "${{ secrets.COGNITO_CLIENT_ID }}" \
             --arg COGNITO_USER_POOL_ID "${{ secrets.COGNITO_USER_POOL_ID }}" \
+            --arg AWS_REGION "${{ secrets.AWS_REGION }}" \
+            --arg AWS_S3_BUCKET "${{ secrets.AWS_S3_BUCKET }}" \
+            --arg AWS_COGNITO_DOMAIN "${{ secrets.AWS_COGNITO_DOMAIN }}" \
+            --arg AWS_REKOGNITION_KEY "${{ secrets.AWS_REKOGNITION_KEY }}" \
+            --arg NEXT_PUBLIC_COGNITO_DOMAIN "${{ secrets.NEXT_PUBLIC_COGNITO_DOMAIN }}" \
+            --arg DATABASE_URL "${{ secrets.DATABASE_URL }}" \
+            --arg DB_HOST "${{ secrets.DB_HOST }}" \
+            --arg DB_NAME "${{ secrets.DB_NAME }}" \
+            --arg DB_PASSWORD "${{ secrets.DB_PASSWORD }}" \
+            --arg DB_PORT "${{ secrets.DB_PORT }}" \
+            --arg DB_SSL "${{ secrets.DB_SSL }}" \
+            --arg DB_USER "${{ secrets.DB_USER }}" \
             'if .taskRoleArn == null then del(.taskRoleArn) else . end |
              if .runtimePlatform == null then del(.runtimePlatform) else . end |
              .containerDefinitions[0].image=$IMAGE |
              .containerDefinitions[0].environment = (.containerDefinitions[0].environment // []) |
-             .containerDefinitions[0].environment |= map(select(.name != "OPENAI_API_KEY" and .name != "COGNITO_CLIENT_ID" and .name != "COGNITO_USER_POOL_ID")) + [
+             .containerDefinitions[0].environment |= map(select(
+               .name != "OPENAI_API_KEY" and 
+               .name != "COGNITO_CLIENT_ID" and 
+               .name != "COGNITO_USER_POOL_ID" and
+               .name != "AWS_REGION" and
+               .name != "AWS_S3_BUCKET" and
+               .name != "AWS_COGNITO_DOMAIN" and
+               .name != "AWS_REKOGNITION_KEY" and
+               .name != "NEXT_PUBLIC_COGNITO_DOMAIN" and
+               .name != "DATABASE_URL" and
+               .name != "DB_HOST" and
+               .name != "DB_NAME" and
+               .name != "DB_PASSWORD" and
+               .name != "DB_PORT" and
+               .name != "DB_SSL" and
+               .name != "DB_USER"
+             )) + [
                {"name": "OPENAI_API_KEY", "value": $OPENAI_KEY},
                {"name": "COGNITO_CLIENT_ID", "value": $COGNITO_CLIENT_ID},
-               {"name": "COGNITO_USER_POOL_ID", "value": $COGNITO_USER_POOL_ID}
+               {"name": "COGNITO_USER_POOL_ID", "value": $COGNITO_USER_POOL_ID},
+               {"name": "AWS_REGION", "value": $AWS_REGION},
+               {"name": "AWS_S3_BUCKET", "value": $AWS_S3_BUCKET},
+               {"name": "AWS_COGNITO_DOMAIN", "value": $AWS_COGNITO_DOMAIN},
+               {"name": "AWS_REKOGNITION_KEY", "value": $AWS_REKOGNITION_KEY},
+               {"name": "NEXT_PUBLIC_COGNITO_DOMAIN", "value": $NEXT_PUBLIC_COGNITO_DOMAIN},
+               {"name": "DATABASE_URL", "value": $DATABASE_URL},
+               {"name": "DB_HOST", "value": $DB_HOST},
+               {"name": "DB_NAME", "value": $DB_NAME},
+               {"name": "DB_PASSWORD", "value": $DB_PASSWORD},
+               {"name": "DB_PORT", "value": $DB_PORT},
+               {"name": "DB_SSL", "value": $DB_SSL},
+               {"name": "DB_USER", "value": $DB_USER}
              ]' taskdef.json > new-taskdef.json
           
           cat new-taskdef.json
