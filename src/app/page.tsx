@@ -44,7 +44,6 @@ const outputOptions: OutputOption[] = [
   { id: 'mindmap', name: 'Mind Map', icon: 'fas fa-brain' },
   { id: 'quiz', name: 'Quiz', icon: 'fas fa-question-circle' },
   { id: 'summary', name: 'Summary', icon: 'fas fa-chart-bar' },
-  { id: 'exam', name: 'Exam Paper', icon: 'fas fa-file-alt' },
 ];
 
 const features: Feature[] = [
@@ -94,8 +93,6 @@ export default function Home() {
   
   const mainContentRef = useRef<HTMLDivElement>(null);
 
-  // Font Awesome is now loaded globally in layout.tsx
-
   // Close user menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -129,7 +126,6 @@ export default function Home() {
 
   const checkAuthStatus = async () => {
     try {
-      // Check both Cognito session and legacy auth
       const sessionData = sessionStorage.getItem('cognitoSession');
       const localData = localStorage.getItem('cognitoSession');
       const legacyToken = localStorage.getItem('authToken');
@@ -143,7 +139,6 @@ export default function Home() {
         }
       }
       
-      // Fallback to legacy storage
       if (legacyToken) {
         const userData = localStorage.getItem('userData');
         if (userData) {
@@ -153,7 +148,6 @@ export default function Home() {
         }
       }
       
-      // Not authenticated
       setIsAuthenticated(false);
       setUser(null);
     } catch (error) {
@@ -167,13 +161,11 @@ export default function Home() {
     try {
       setLoading(true);
       
-      // Clear all session data
       sessionStorage.removeItem('cognitoSession');
       localStorage.removeItem('cognitoSession');
       sessionStorage.removeItem('authToken');
       localStorage.removeItem('userData');
       
-      // Add 1 second delay
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       setIsAuthenticated(false);
@@ -181,9 +173,6 @@ export default function Home() {
       setShowUserMenu(false);
       
       setLoading(false);
-      
-      // Optional: redirect to home or login
-      // window.location.href = '/';
     } catch (error) {
       console.error('Logout error:', error);
       setLoading(false);
@@ -237,16 +226,14 @@ export default function Home() {
       setShowQuiz(true);
       return;
     }
-
     if (selectedOutputOption === 'picture') {
       setShowPicture(true);
       return;
     }
+  };
 
-    if (selectedOutputOption === 'exam') {
-      setShowExam(true);
-      return;
-    }
+  const handleGenerateExam = () => {
+    setShowExam(true);
   };
 
   const handleBackFromFlashcards = () => setShowFlashcards(false);
@@ -305,7 +292,6 @@ export default function Home() {
       }
     }
     
-    // Reset the input value to allow uploading the same file again
     event.target.value = '';
   };
 
@@ -551,6 +537,30 @@ export default function Home() {
                 Watch Demo
               </button>
             </div>
+            
+            {/* Educator Exam Paper CTA */}
+            <div className="mt-12 p-8 bg-gradient-to-r from-[#5E2E8F]/20 to-[#D81E83]/20 rounded-3xl border-2 border-[#5E2E8F]/30 backdrop-blur-sm">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="text-left flex-1">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-3 bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] rounded-xl">
+                      <i className="fas fa-chalkboard-teacher text-2xl text-white"></i>
+                    </div>
+                    <h3 className="text-2xl font-bold text-white">Are you an educator?</h3>
+                  </div>
+                  <p className="text-lg text-gray-300">
+                    Try out our service to generate professional exam papers in seconds. Perfect for teachers, tutors, and educational institutions.
+                  </p>
+                </div>
+                <button
+                  onClick={handleGenerateExam}
+                  className="px-8 py-4 rounded-full bg-gradient-to-r from-[#5E2E8F] to-[#D81E83] text-white font-semibold text-lg hover:from-[#4A2480] hover:to-[#C41A75] transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl whitespace-nowrap flex items-center gap-3"
+                >
+                  <i className="fas fa-file-alt"></i>
+                  Generate Exam Paper
+                </button>
+              </div>
+            </div>
           </div>
         </section>
         
@@ -732,9 +742,7 @@ export default function Home() {
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-              {outputOptions.map((option) => {
-                console.log("Rendering option:", option.name);
-                return (
+              {outputOptions.map((option) => (
                 <div
                   key={option.id}
                   className={`text-center p-4 border-2 rounded-xl cursor-pointer transition-all duration-300 hover:scale-105 ${
@@ -747,8 +755,7 @@ export default function Home() {
                   <i className={`${option.icon} text-2xl mb-3 text-[#5E2E8F]`}></i>
                   <p className="text-sm font-medium text-black">{option.name}</p>
                 </div>
-              );
-            })}
+              ))}
             </div>
 
             <div className="text-center mb-6">
