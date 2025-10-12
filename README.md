@@ -1,128 +1,88 @@
-# TrialGreatHack
+# Study Hub - AI-Powered Learning Platform
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)  
-[![TypeScript](https://img.shields.io/badge/lang-TypeScript-yellow)](https://www.typescriptlang.org/)  
-[![Next.js](https://img.shields.io/badge/framework-Next.js-000000)](https://nextjs.org/)
+This is a Next.js application that leverages AI to provide a suite of tools for students and educators. It uses AWS services for backend infrastructure and OpenAI for its AI-powered features.
 
-A web application to **[brief description of what it does]** — importing content (PDF, text files, DOC, images) and generating quizzes from it. Built with Next.js, TypeScript, and AI tools.
+## Features
 
----
+*   **AI-Powered Content Generation:**
+    *   **Exam Generation:** Automatically create exams from PDF documents.
+    *   **Summarization:** Generate concise summaries of long texts.
+    *   **Mind Maps:** Create mind maps to visualize complex topics.
+    *   **Quizzes:** Generate quizzes from your study materials.
+    *   **Text-to-Picture:** Convert text descriptions into images.
+    *   **Video Generation:** Create videos from text or other content.
+*   **Authentication:** Secure user authentication using AWS Cognito.
+*   **PDF Processing:** Extract text from PDFs and generate new PDF documents.
+*   **Database Integration:** Stores and retrieves data from a PostgreSQL database.
+*   **File Storage:** Uses AWS S3 for secure file storage.
+*   **Chatbot:** An interactive chatbot to assist users.
 
-## 📦 Table of Contents
-
-- [Features](#-features)  
-- [Demo / Screenshots](#-demo--screenshots)  
-- [Getting Started](#-getting-started)  
-- [Usage](#-usage)  
-- [Architecture](#-architecture)  
-- [Configuration](#-configuration)  
-- [Contributing](#-contributing)  
-- [License](#-license)
-
----
-
-## 🚀 Features
-
-- Accept uploads of **PDF**, **DOC**, **TXT**, or **image** files.  
-- Extract text using OCR (for images).  
-- Analyze content to identify key facts, concepts, and important points.  
-- Generate quizzes:  
-  - Multiple-choice questions  
-  - True/False questions  
-  - (Optional) Short-answer questions  
-- Balanced difficulty level (easy / medium / hard)  
-- **AI Video Generation**: Create YouTube-style engaging videos from text using Amazon Nova Pro & Nova Reel
-- **Mind Maps**: Generate interactive mind maps from content
-- **Summaries**: AI-powered content summarization
-- **Flashcards**: Create study cards from your content
-- Easily deployable.  
-
----
-
-## 🖼️ Demo / Screenshots
-
-> *(Include screenshots of the app: upload page, quiz generation, result view etc.)*
-
----
-
-## 🛠 Getting Started
-
-These instructions will get you a copy of the project up and running on your local machine for development and testing.
+## Getting Started
 
 ### Prerequisites
 
-- Node.js (>= 16.x)  
-- npm or yarn or pnpm  
-- AWS Account with Bedrock access
-- Amazon Nova Reel model access (request in AWS Bedrock console)
-- S3 bucket for video storage
-- Optional: setup for OCR (if using external service)  
+*   Node.js (v20 or later)
+*   npm
+*   An AWS account
+*   An OpenAI account
+*   A PostgreSQL database
 
 ### Installation
 
-```bash
-# clone the repository
-git clone https://github.com/fujianmian/TrialGreatHack.git
-cd TrialGreatHack
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/fujianmian/TrialGreatHack.git
+    cd TrialGreatHack
+    ```
 
-# install dependencies
-npm install
-# or
-yarn install
-# or
-pnpm install
+2.  Install the dependencies:
+    ```bash
+    npm install
+    ```
 
-# create environment file
-cp .env.example .env.local
-# Edit .env.local with your AWS credentials and S3 bucket
+3.  Set up the environment variables. Create a `.env.local` file in the root of the project and add the following environment variables:
 
-# run the development server
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-```
+    ```
+    # AWS Credentials
+    AWS_ACCESS_KEY_ID=your_aws_access_key_id
+    AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
+    AWS_REGION=your_aws_region
+    AWS_S3_BUCKET=your_s3_bucket_name
 
-### Configuration
+    # AWS Cognito
+    NEXT_PUBLIC_COGNITO_DOMAIN=your_cognito_domain
+    NEXT_PUBLIC_COGNITO_CLIENT_ID=your_cognito_client_id
+    NEXT_PUBLIC_COGNITO_USER_POOL_ID=your_cognito_user_pool_id
+    NEXT_PUBLIC_AWS_REGION=your_aws_region
+    COGNITO_CLIENT_ID=your_cognito_client_id
 
-Create a `.env.local` file with the following variables:
+    # Database
+    DATABASE_URL=your_database_url
+    DB_SSL=true
 
-```env
-# AWS Configuration for Nova Reel
-AWS_ACCESS_KEY_ID=your_access_key_here
-AWS_SECRET_ACCESS_KEY=your_secret_key_here
-AWS_REGION=us-east-1
+    # OpenAI
+    OPENAI_API_KEY=your_openai_api_key
 
-# S3 Bucket for video storage (required for Nova Reel)
-AWS_S3_BUCKET=your-video-bucket-name
+    # Application
+    NEXT_PUBLIC_BASE_URL=http://localhost:3000
+    ```
 
-OPENAI_API_KEY=your-openai-key
-```
+4.  Initialize the database:
+    ```bash
+    npm run db:init
+    ```
 
-**Important Setup Steps:**
+5.  Run the development server:
+    ```bash
+    npm run dev
+    ```
 
-1. **AWS Bedrock Access**: Request access to `amazon.nova-pro-v1:0` and `amazon.nova-reel-v1:0` in the [AWS Bedrock Console](https://console.aws.amazon.com/bedrock/)
-2. **S3 Bucket**: Create an S3 bucket for video storage and ensure your AWS user has proper permissions
-3. **IAM Permissions**: Your AWS user needs `bedrock:InvokeModel` and S3 permissions
+The application will be available at `http://localhost:3000`.
 
-## 🎬 Enhanced Video Generation Features
+## Scripts
 
-The application now generates **YouTube-style engaging videos** with intelligent background fetching:
-
-- **5 Video Styles**: Educational, Documentary, Cinematic, Modern, Corporate
-- **Smart Background Analysis**: Nova Pro analyzes content to suggest specific, relevant backgrounds and environments
-- **Content-Specific Visuals**: AI identifies key themes and suggests appropriate visual elements, props, and scenes
-- **Dynamic Visual Storytelling**: Each video shot includes specific camera movements, lighting, and contextual environments
-- **Intelligent Visual Metaphors**: AI creates visual representations for abstract concepts
-- **High Quality**: 16:9 aspect ratio, professional-grade output with contextual backgrounds
-- **Multi-Shot Videos**: Up to 2 minutes with consistent style and relevant visual elements
-
-### 🧠 AI Content Analysis
-- **Theme Detection**: Identifies key concepts and themes in your content
-- **Visual Metaphor Generation**: Creates appropriate visual representations
-- **Background Suggestions**: Recommends specific environments (labs, offices, nature, etc.)
-- **Contextual Props**: Suggests relevant visual elements and scene details
-- **Professional Cinematography**: Specifies camera movements, lighting, and composition
-
-See [AWS_BEDROCK_SETUP.md](./AWS_BEDROCK_SETUP.md) for detailed setup instructions.
+*   `npm run dev`: Starts the development server.
+*   `npm run build`: Builds the application for production.
+*   `npm run start`: Starts the production server.
+*   `npm run lint`: Lints the codebase.
+*   `npm run db:init`: Initializes the database.
